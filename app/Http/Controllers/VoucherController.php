@@ -10,6 +10,7 @@ use App\Models\Party;
 use App\Models\FinancialYear;
 use App\Models\CostCenter;
 use App\Models\JournalEntry;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -84,7 +85,7 @@ class VoucherController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Voucher/Index', [
+        return Inertia::render('voucher/index', [
             'vouchers' => $vouchers,
             'voucher_types' => $voucherTypes,
             'parties' => $parties,
@@ -129,7 +130,7 @@ class VoucherController extends Controller
                 ->orderBy('name')
                 ->get();
 
-            return Inertia::render('Voucher/SelectType', [
+            return Inertia::render('voucher/select-type', [
                 'voucher_types' => $voucherTypes,
             ]);
         }
@@ -170,7 +171,7 @@ class VoucherController extends Controller
                 ->get();
         }
 
-        return Inertia::render('Voucher/Create', [
+        return Inertia::render('voucher/create', [
             'voucher_type' => $voucherType,
             'next_voucher_number' => $nextVoucherNumber,
             'financial_year' => $financialYear,
@@ -320,7 +321,7 @@ class VoucherController extends Controller
             return redirect()->route('voucher.index');
         }
 
-        return Inertia::render('Voucher/Show', [
+        return Inertia::render('voucher/show', [
             'voucher' => $voucher,
         ]);
     }
@@ -371,7 +372,7 @@ class VoucherController extends Controller
                 ->get();
         }
 
-        return Inertia::render('Voucher/Edit', [
+        return Inertia::render('voucher/edit', [
             'voucher' => $voucher,
             'grouped_accounts' => $groupedAccounts,
             'parties' => $parties,
@@ -698,7 +699,7 @@ class VoucherController extends Controller
             ];
         }
 
-        return Inertia::render('Voucher/Duplicate', [
+        return Inertia::render('voucher/duplicate', [
             'voucher' => $duplicateVoucher,
             'original_voucher' => $voucher,
             'voucher_type' => $voucher->voucherType,
@@ -723,7 +724,7 @@ class VoucherController extends Controller
             return redirect()->route('voucher.index');
         }
 
-        return Inertia::render('Voucher/Print', [
+        return Inertia::render('voucher/print', [
             'voucher' => $voucher,
         ]);
     }

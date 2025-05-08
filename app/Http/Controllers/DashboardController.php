@@ -78,8 +78,8 @@ class DashboardController extends Controller
         $incomeExpenseData = $this->getMonthlyIncomeExpense($businessId, $financialYear->id);
 
         return Inertia::render('dashboard/index', [
-            'business' => $business,
-            'financialYear' => $financialYear,
+            'businessD' => $business,
+            'financialYearD' => $financialYear,
             'summary' => [
                 'total_assets' => $totalAssets,
                 'total_liabilities' => $totalLiabilities,

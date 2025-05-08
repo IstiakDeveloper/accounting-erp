@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import NavLink from '@/components/nav-link';
 import Dropdown from '@/components/dropdown';
+import SidebarNavigation from '@/components/sidebar-navigation';
 import FlashMessage from '@/components/flash-message';
 
 interface User {
@@ -247,9 +248,8 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
 
             {/* Sidebar */}
             <aside
-                className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white border-r border-gray-200 shadow-lg transition-transform duration-300 ease-in-out lg:static lg:inset-0 lg:translate-x-0 ${
-                    sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-                }`}
+                className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white border-r border-gray-200 shadow-lg transition-transform duration-300 ease-in-out lg:static lg:inset-0 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                    }`}
             >
                 {/* Logo */}
                 <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
@@ -286,11 +286,10 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                                     <Link
                                         key={biz.id}
                                         href={route('business.set_current', biz.id)}
-                                        className={`block px-4 py-2 text-sm transition-colors hover:bg-gray-100 ${
-                                            currentBusiness?.id === biz.id
-                                                ? 'bg-gray-100 font-medium'
-                                                : 'text-gray-700'
-                                        }`}
+                                        className={`block px-4 py-2 text-sm transition-colors hover:bg-gray-100 ${currentBusiness?.id === biz.id
+                                            ? 'bg-gray-100 font-medium'
+                                            : 'text-gray-700'
+                                            }`}
                                     >
                                         {biz.name}
                                     </Link>
@@ -309,7 +308,15 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                             <div className="px-2 py-1 mt-2 text-xs text-gray-500">
                                 <span>Financial Year: </span>
                                 <span className="font-medium">
-                                    {financialYear.start_date} - {financialYear.end_date}
+                                    {new Date(financialYear.start_date).toLocaleDateString('en-BD', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric'
+                                    })} - {new Date(financialYear.end_date).toLocaleDateString('en-BD', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric'
+                                    })}
                                 </span>
                             </div>
                         )}
@@ -317,62 +324,7 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                 )}
 
                 {/* Navigation */}
-                <nav className="px-4 py-4 overflow-y-auto h-[calc(100vh-150px)]">
-                    <ul className="space-y-1">
-                        {isAuthenticated && filteredMenuItems.map((item, index) => (
-                            <li key={index} className="mb-2">
-                                {item.submenu ? (
-                                    <div>
-                                        <button
-                                            onClick={() => toggleSubmenu(item.label)}
-                                            className={`flex items-center justify-between w-full px-4 py-2 text-sm font-medium rounded-md ${
-                                                openSubmenus[item.label] ? 'bg-indigo-50 text-indigo-600' : 'text-gray-700 hover:bg-gray-100'
-                                            }`}
-                                        >
-                                            <div className="flex items-center">
-                                                {item.icon}
-                                                <span className="ml-3">{item.label}</span>
-                                            </div>
-                                            <ChevronDown
-                                                size={16}
-                                                className={`transition-transform duration-200 ${
-                                                    openSubmenus[item.label] ? 'rotate-180' : ''
-                                                }`}
-                                            />
-                                        </button>
-                                        {openSubmenus[item.label] && (
-                                            <ul className="pl-4 mt-1 space-y-1">
-                                                {item.submenu.map((subitem, subindex) => (
-                                                    <li key={subindex}>
-                                                        <Link
-                                                            href={subitem.href || '#'}
-                                                            className="flex items-center px-4 py-2 text-sm text-gray-600 rounded-md hover:bg-gray-100"
-                                                        >
-                                                            {subitem.icon}
-                                                            <span className="ml-3">{subitem.label}</span>
-                                                        </Link>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <Link
-                                        href={item.href || '#'}
-                                        className={`flex items-center px-4 py-2 text-sm font-medium rounded-md ${
-                                            window.location.pathname === item.href
-                                                ? 'bg-indigo-50 text-indigo-600'
-                                                : 'text-gray-700 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        {item.icon}
-                                        <span className="ml-3">{item.label}</span>
-                                    </Link>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </nav>
+                <SidebarNavigation/>
             </aside>
 
             {/* Main Content */}
@@ -422,9 +374,8 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                                                     <Link
                                                         key={notification.id}
                                                         href={notification.link || route('notification.mark_read', notification.id)}
-                                                        className={`block px-4 py-2 text-sm transition-colors hover:bg-gray-100 ${
-                                                            !notification.is_read ? 'bg-blue-50' : ''
-                                                        }`}
+                                                        className={`block px-4 py-2 text-sm transition-colors hover:bg-gray-100 ${!notification.is_read ? 'bg-blue-50' : ''
+                                                            }`}
                                                     >
                                                         <div className="font-medium">{notification.title}</div>
                                                         <div className="text-gray-600 truncate">{notification.message}</div>

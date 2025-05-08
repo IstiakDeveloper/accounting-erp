@@ -31,7 +31,7 @@ class AccountGroupController extends Controller
         // Get account groups as flat array with level indication for dropdown
         $flatGroups = AccountGroup::getFlatHierarchy($businessId);
 
-        return Inertia::render('AccountGroup/Index', [
+        return Inertia::render('account-group/index', [
             'account_groups' => $accountGroups,
             'flat_groups' => $flatGroups,
         ]);
@@ -51,7 +51,7 @@ class AccountGroupController extends Controller
         // Get account groups as flat array with level indication for dropdown
         $flatGroups = AccountGroup::getFlatHierarchy($businessId);
 
-        return Inertia::render('AccountGroup/Create', [
+        return Inertia::render('account-group/create', [
             'parent_groups' => $flatGroups,
             'natures' => [
                 'assets' => 'Assets',
@@ -124,7 +124,7 @@ class AccountGroupController extends Controller
             return redirect()->route('account_group.index');
         }
 
-        return Inertia::render('AccountGroup/Show', [
+        return Inertia::render('account-group/show', [
             'account_group' => $accountGroup,
         ]);
     }
@@ -157,7 +157,7 @@ class AccountGroupController extends Controller
             return !in_array($group->id, $descendantIds);
         })->values();
 
-        return Inertia::render('AccountGroup/Edit', [
+        return Inertia::render('account-group/edit', [
             'account_group' => $accountGroup,
             'parent_groups' => $parentGroups,
             'natures' => [

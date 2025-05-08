@@ -42,7 +42,7 @@ use Inertia\Inertia;
 
 // Public routes
 Route::get('/', function () {
-    return Inertia::render('Welcome');
+    return Inertia::render('welcome');
 })->name('welcome');
 
 // Auth routes
@@ -167,11 +167,12 @@ Route::middleware('auth')->group(function () {
 
         // Journal Entries
         Route::prefix('journal-entry')->name('journal_entry.')->group(function () {
-            Route::get('/', [JournalEntryController::class, 'index'])->name('index');
-            Route::get('/{id}', [JournalEntryController::class, 'show'])->name('show');
+
             Route::get('/day-book', [JournalEntryController::class, 'dayBook'])->name('day_book');
             Route::get('/cash-book', [JournalEntryController::class, 'cashBook'])->name('cash_book');
             Route::get('/general-ledger', [JournalEntryController::class, 'generalLedger'])->name('general_ledger');
+            Route::get('/', [JournalEntryController::class, 'index'])->name('index');
+            Route::get('/{id}', [JournalEntryController::class, 'show'])->name('show');
         });
 
         // Cost Centers

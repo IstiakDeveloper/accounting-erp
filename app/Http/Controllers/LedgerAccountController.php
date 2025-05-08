@@ -33,7 +33,7 @@ class LedgerAccountController extends Controller
             return $account->accountGroup->name;
         });
 
-        return Inertia::render('LedgerAccount/Index', [
+        return Inertia::render('ledger-account/index', [
             'grouped_accounts' => $groupedAccounts,
             'ledger_accounts' => $ledgerAccounts,
         ]);
@@ -53,7 +53,7 @@ class LedgerAccountController extends Controller
         // Get account groups as flat array with level indication for dropdown
         $flatGroups = AccountGroup::getFlatHierarchy($businessId);
 
-        return Inertia::render('LedgerAccount/Create', [
+        return Inertia::render('ledger-account/create', [
             'account_groups' => $flatGroups,
             'balance_types' => [
                 'debit' => 'Debit',
@@ -147,7 +147,7 @@ class LedgerAccountController extends Controller
         // Check if this account is linked to a party
         $party = Party::where('ledger_account_id', $id)->first();
 
-        return Inertia::render('LedgerAccount/Show', [
+        return Inertia::render('ledger-account/show', [
             'ledger_account' => $ledgerAccount,
             'balance' => $balance,
             'journal_entries' => $journalEntries,
@@ -175,7 +175,7 @@ class LedgerAccountController extends Controller
         // Get account groups as flat array with level indication for dropdown
         $flatGroups = AccountGroup::getFlatHierarchy($businessId);
 
-        return Inertia::render('LedgerAccount/Edit', [
+        return Inertia::render('ledger-account/edit', [
             'ledger_account' => $ledgerAccount,
             'account_groups' => $flatGroups,
             'balance_types' => [
@@ -357,7 +357,7 @@ class LedgerAccountController extends Controller
             $openingBalanceType = $ledgerAccount->opening_balance_type;
         }
 
-        return Inertia::render('LedgerAccount/Ledger', [
+        return Inertia::render('ledger-account/ledger', [
             'ledger_account' => $ledgerAccount,
             'journal_entries' => $journalEntries,
             'opening_balance' => $openingBalance,

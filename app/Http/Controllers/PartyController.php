@@ -34,7 +34,7 @@ class PartyController extends Controller
             $party->balance = $party->getBalance();
         }
 
-        return Inertia::render('Party/Index', [
+        return Inertia::render('party/index', [
             'parties' => $parties,
         ]);
     }
@@ -59,7 +59,7 @@ class PartyController extends Controller
             ->where('name', 'Accounts Payable')
             ->first();
 
-        return Inertia::render('Party/Create', [
+        return Inertia::render('party/create', props: [
             'party_types' => [
                 'customer' => 'Customer',
                 'supplier' => 'Supplier',
@@ -197,7 +197,7 @@ class PartyController extends Controller
             ->take(10)
             ->get();
 
-        return Inertia::render('Party/Show', [
+        return Inertia::render('party/show', [
             'party' => $party,
             'balance' => $balance,
             'vouchers' => $vouchers,
@@ -218,7 +218,7 @@ class PartyController extends Controller
             return redirect()->route('party.index');
         }
 
-        return Inertia::render('Party/Edit', [
+        return Inertia::render('party/edit', props: [
             'party' => $party,
             'party_types' => [
                 'customer' => 'Customer',
@@ -430,7 +430,7 @@ class PartyController extends Controller
             $openingBalanceType = $party->ledgerAccount->opening_balance_type;
         }
 
-        return Inertia::render('Party/Ledger', [
+        return Inertia::render('party/ledger', [
             'party' => $party,
             'journal_entries' => $journalEntries,
             'opening_balance' => $openingBalance,

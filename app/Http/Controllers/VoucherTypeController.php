@@ -23,7 +23,7 @@ class VoucherTypeController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('VoucherType/Index', [
+        return Inertia::render('voucher-type/index', [
             'voucher_types' => $voucherTypes,
         ]);
     }
@@ -33,7 +33,7 @@ class VoucherTypeController extends Controller
      */
     public function create()
     {
-        return Inertia::render('VoucherType/Create', [
+        return Inertia::render('voucher-type/create', [
             'natures' => [
                 'receipt' => 'Receipt',
                 'payment' => 'Payment',
@@ -96,7 +96,7 @@ class VoucherTypeController extends Controller
             return redirect()->route('voucher_type.index');
         }
 
-        return Inertia::render('VoucherType/Show', [
+        return Inertia::render('voucher-type/show', [
             'voucher_type' => $voucherType,
         ]);
     }
@@ -118,7 +118,7 @@ class VoucherTypeController extends Controller
             return back()->withErrors(['error' => 'System voucher types cannot be edited.']);
         }
 
-        return Inertia::render('VoucherType/Edit', [
+        return Inertia::render('voucher-type/edit', [
             'voucher_type' => $voucherType,
             'natures' => [
                 'receipt' => 'Receipt',

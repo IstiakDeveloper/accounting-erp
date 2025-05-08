@@ -87,7 +87,7 @@ class JournalEntryController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('JournalEntry/Index', [
+        return Inertia::render('journal-entry/index', [
             'journal_entries' => $journalEntries,
             'ledger_accounts' => $ledgerAccounts,
             'voucher_types' => $voucherTypes,
@@ -115,7 +115,7 @@ class JournalEntryController extends Controller
             return redirect()->route('journal_entry.index');
         }
 
-        return Inertia::render('JournalEntry/Show', [
+        return Inertia::render('journal-entry/show', [
             'journal_entry' => $journalEntry,
         ]);
     }
@@ -166,7 +166,7 @@ class JournalEntryController extends Controller
             }
         }
 
-        return Inertia::render('JournalEntry/DayBook', [
+        return Inertia::render('journal-entry/day-book', [
             'vouchers' => $vouchers,
             'voucher_types' => $voucherTypes,
             'totals' => [
@@ -269,7 +269,7 @@ class JournalEntryController extends Controller
                 ->get();
         }
 
-        return Inertia::render('JournalEntry/CashBook', [
+        return Inertia::render('journal-entry/cash-book', [
             'cash_and_bank_accounts' => $cashAndBankAccounts,
             'journal_entries' => $journalEntries,
             'opening_balance' => $openingBalance,
@@ -309,7 +309,7 @@ class JournalEntryController extends Controller
                 return $account->accountGroup->name;
             });
 
-            return Inertia::render('JournalEntry/SelectAccount', [
+            return Inertia::render('journal-entry/select-account', [
                 'grouped_accounts' => $groupedAccounts,
                 'return_url' => 'journal_entry.general_ledger',
             ]);
@@ -424,7 +424,7 @@ class JournalEntryController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('JournalEntry/GeneralLedger', [
+        return Inertia::render('journal-entry/general-ledger', [
             'account' => $account,
             'journal_entries' => $journalEntries,
             'opening_balance' => $openingBalance,

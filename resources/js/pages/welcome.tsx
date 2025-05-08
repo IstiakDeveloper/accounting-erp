@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -79,6 +78,166 @@ export default function Welcome() {
                   alt="Dashboard example"
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-16 bg-slate-50">
+        <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
+              Powerful Features
+            </h2>
+            <p className="max-w-2xl mx-auto mt-3 text-xl text-slate-500 sm:mt-4">
+              Everything you need to manage your business finances in one place
+            </p>
+          </div>
+
+          <div className="grid max-w-2xl grid-cols-1 gap-6 mx-auto mt-12 sm:grid-cols-2 lg:max-w-none lg:grid-cols-3">
+            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
+              <div className="p-3 mb-4 text-white bg-green-600 rounded-full w-fit">
+                <DollarSign className="w-6 h-6" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-slate-900">Financial Management</h3>
+              <p className="flex-1 mb-4 text-base text-slate-500">
+                Easily manage your business finances with tools for budgeting, invoicing, and tracking expenses.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Expense Tracking</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Budgeting Tools</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Financial Ratios</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
+              <div className="p-3 mb-4 text-white bg-blue-600 rounded-full w-fit">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-slate-900">Double-Entry Accounting</h3>
+              <p className="flex-1 mb-4 text-base text-slate-500">
+                Professional double-entry accounting system ensures accurate financial records and proper audit trails.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Journal Entries</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">General Ledger</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Trial Balance</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
+              <div className="p-3 mb-4 text-white bg-purple-600 rounded-full w-fit">
+                <PieChart className="w-6 h-6" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-slate-900">Comprehensive Reports</h3>
+              <p className="flex-1 mb-4 text-base text-slate-500">
+                Generate detailed financial reports to monitor your business performance and make informed decisions.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Balance Sheet</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Profit & Loss Statement</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Cash Flow Statement</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
+              <div className="p-3 mb-4 text-white bg-yellow-500 rounded-full w-fit">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-slate-900">Invoicing & Payments</h3>
+              <p className="flex-1 mb-4 text-base text-slate-500">
+                Create professional invoices and track payments from your customers with our intuitive tools.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Custom Invoices</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Recurring Bills</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Payment Processing</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
+              <div className="p-3 mb-4 text-white bg-red-500 rounded-full w-fit">
+                <UserPlus className="w-6 h-6" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-slate-900">Multi-User Access</h3>
+              <p className="flex-1 mb-4 text-base text-slate-500">
+                Collaborate with your team by setting up accounts with different permission levels for better control.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Role-Based Access</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Activity Logs</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Team Collaboration</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
+              <div className="p-3 mb-4 text-white bg-indigo-600 rounded-full w-fit">
+                <PieChart className="w-6 h-6" />
+              </div>
+              <h3 className="mb-2 text-lg font-medium text-slate-900">Tax Preparation</h3>
+              <p className="flex-1 mb-4 text-base text-slate-500">
+                Simplify tax season with accurate financial records and reports designed for tax filing requirements.
+              </p>
+              <ul className="space-y-2">
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Tax Reports</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Expense Categories</span>
+                </li>
+                <li className="flex items-start">
+                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
+                  <span className="ml-2 text-sm text-slate-600">Year-End Summaries</span>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
@@ -253,88 +412,7 @@ export default function Welcome() {
             </p>
           </div>
         </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-16 bg-slate-50">
-        <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">
-              Powerful Features
-            </h2>
-            <p className="max-w-2xl mx-auto mt-3 text-xl text-slate-500 sm:mt-4">
-              Everything you need to manage your business finances in one place
-            </p>
-          </div>
-
-          <div className="grid max-w-2xl grid-cols-1 gap-6 mx-auto mt-12 sm:grid-cols-2 lg:max-w-none lg:grid-cols-3">
-            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
-              <div className="p-3 mb-4 text-white bg-green-600 rounded-full w-fit">
-                <DollarSign className="w-6 h-6" />
-              </div>
-              <h3 className="mb-2 text-lg font-medium text-slate-900">Financial Management</h3>
-              <p className="flex-1 mb-4 text-base text-slate-500">
-                Easily manage your business finances with tools for budgeting, invoicing, and tracking expenses.
-              </p>
-              <ul className="space-y-2">
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Expense Tracking</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Budgeting Tools</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Financial Ratios</span>
-                </li>
-              </ul>
-              <div className="p-3 mb-4 text-white bg-blue-600 rounded-full w-fit">
-                <BookOpen className="w-6 h-6" />
-              </div>
-              <h3 className="mb-2 text-lg font-medium text-slate-900">Double-Entry Accounting</h3>
-              <p className="flex-1 mb-4 text-base text-slate-500">
-                Professional double-entry accounting system ensures accurate financial records and proper audit trails.
-              </p>
-              <ul className="space-y-2">
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Journal Entries</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">General Ledger</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Trial Balance</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
-              <div className="p-3 mb-4 text-white bg-purple-600 rounded-full w-fit">
-                <PieChart className="w-6 h-6" />
-              </div>
-              <h3 className="mb-2 text-lg font-medium text-slate-900">Comprehensive Reports</h3>
-              <p className="flex-1 mb-4 text-base text-slate-500">
-                Generate detailed financial reports to monitor your business performance and make informed decisions.
-              </p>
-              <ul className="space-y-2">
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Balance Sheet</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Profit & Loss Statement</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="flex-shrink-0 w-5 h-5 text-green-500" />
-                  <span className="ml-2 text-sm text-slate-600">Cash Flow Statement</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="flex flex-col h-full p-6 bg-white rounded-lg shadow">
+      </footer>
+    </div>
+  );
+}

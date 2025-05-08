@@ -28,7 +28,7 @@ class FinancialYearController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('FinancialYear/Index', [
+        return Inertia::render('financial-year/index', [
             'financial_years' => $financialYears,
         ]);
     }
@@ -60,7 +60,7 @@ class FinancialYearController extends Controller
             $suggestedEndDate = Carbon::parse($business->financial_year_end)->format('Y-m-d');
         }
 
-        return Inertia::render('FinancialYear/Create', [
+        return Inertia::render('financial-year/create', [
             'business' => $business,
             'suggested_start_date' => $suggestedStartDate,
             'suggested_end_date' => $suggestedEndDate,
@@ -163,7 +163,7 @@ class FinancialYearController extends Controller
 
         $netProfit = ($totalIncome->total ?? 0) - ($totalExpense->total ?? 0);
 
-        return Inertia::render('FinancialYear/Show', [
+        return Inertia::render('financial-year/show', [
             'financial_year' => $financialYear,
             'summary' => [
                 'total_transactions' => $totalTransactions,
@@ -192,7 +192,7 @@ class FinancialYearController extends Controller
 
         $business = Business::findOrFail($businessId);
 
-        return Inertia::render('FinancialYear/Edit', [
+        return Inertia::render('financial-year/edit', [
             'financial_year' => $financialYear,
             'business' => $business,
         ]);
