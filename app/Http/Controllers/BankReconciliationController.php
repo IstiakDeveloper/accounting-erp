@@ -36,7 +36,7 @@ class BankReconciliationController extends Controller
             ->orderBy('id', 'desc')
             ->paginate(15);
 
-        return Inertia::render('BankReconciliation/Index', [
+        return Inertia::render('bank-reconciliation/index', [
             'reconciliations' => $reconciliations,
         ]);
     }
@@ -48,9 +48,12 @@ class BankReconciliationController extends Controller
     {
         $businessId = session('current_business_id');
 
+
+
         if (!$businessId) {
             return redirect()->route('business.select');
         }
+
 
         // Check if bank reconciliation is enabled
         if (!SystemSetting::isEnableBankReconciliation($businessId)) {
@@ -69,7 +72,7 @@ class BankReconciliationController extends Controller
             return back()->withErrors(['error' => 'No bank accounts found. Please create a bank account first.']);
         }
 
-        return Inertia::render('BankReconciliation/Create', [
+        return Inertia::render('bank-reconciliation/create', [
             'bank_accounts' => $bankAccounts,
             'today' => date('Y-m-d'),
         ]);
@@ -160,7 +163,7 @@ class BankReconciliationController extends Controller
             return redirect()->route('bank_reconciliation.index');
         }
 
-        return Inertia::render('BankReconciliation/Show', [
+        return Inertia::render('bank-reconciliation/show', [
             'reconciliation' => $reconciliation,
         ]);
     }
@@ -200,7 +203,7 @@ class BankReconciliationController extends Controller
         // Calculate difference
         $difference = $reconciliation->statement_balance - $reconciliation->reconciled_balance;
 
-        return Inertia::render('BankReconciliation/Reconcile', [
+        return Inertia::render('bank-reconciliation/reconcile', [
             'reconciliation' => $reconciliation,
             'unreconciled_entries' => $unreconciledEntries,
             'reconciled_entries' => $reconciledEntries,

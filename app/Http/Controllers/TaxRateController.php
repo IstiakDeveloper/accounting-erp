@@ -23,7 +23,7 @@ class TaxRateController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('TaxRate/Index', [
+        return Inertia::render('tax-rate/index', [
             'tax_rates' => $taxRates,
         ]);
     }
@@ -33,7 +33,7 @@ class TaxRateController extends Controller
      */
     public function create()
     {
-        return Inertia::render('TaxRate/Create');
+        return Inertia::render('tax-rate/create');
     }
 
     /**
@@ -88,7 +88,7 @@ class TaxRateController extends Controller
             'inclusive_10000' => $taxRate->calculate(10000, true),
         ];
 
-        return Inertia::render('TaxRate/Show', [
+        return Inertia::render('tax-rate/show', [
             'tax_rate' => $taxRate,
             'examples' => $examples,
         ]);
@@ -106,7 +106,7 @@ class TaxRateController extends Controller
             return redirect()->route('tax_rate.index');
         }
 
-        return Inertia::render('TaxRate/Edit', [
+        return Inertia::render('tax-rate/edit', [
             'tax_rate' => $taxRate,
         ]);
     }

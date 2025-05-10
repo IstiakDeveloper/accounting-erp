@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\CostCenter;
+use App\Models\SystemSetting;
 use App\Models\VoucherItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,7 @@ class CostCenterController extends Controller
         // Get cost centers as flat array with level indication for dropdown
         $flatCenters = CostCenter::getFlatHierarchy($businessId);
 
-        return Inertia::render('CostCenter/Index', [
+        return Inertia::render('cost-center/index', [
             'cost_centers' => $costCenters,
             'flat_centers' => $flatCenters,
         ]);
@@ -63,7 +64,7 @@ class CostCenterController extends Controller
         // Get cost centers as flat array with level indication for dropdown
         $flatCenters = CostCenter::getFlatHierarchy($businessId);
 
-        return Inertia::render('CostCenter/Create', [
+        return Inertia::render('cost-center/create', [
             'parent_centers' => $flatCenters,
         ]);
     }
@@ -143,7 +144,7 @@ class CostCenterController extends Controller
         // Calculate totals
         $totals = $costCenter->getTotals();
 
-        return Inertia::render('CostCenter/Show', [
+        return Inertia::render('cost-center/show', [
             'cost_center' => $costCenter,
             'voucher_items' => $voucherItems,
             'totals' => $totals,
@@ -173,7 +174,7 @@ class CostCenterController extends Controller
             return !in_array($center->id, $descendantIds);
         })->values();
 
-        return Inertia::render('CostCenter/Edit', [
+        return Inertia::render('cost-center/edit', [
             'cost_center' => $costCenter,
             'parent_centers' => $parentCenters,
         ]);
@@ -322,7 +323,7 @@ class CostCenterController extends Controller
             }
         }
 
-        return Inertia::render('CostCenter/Report', [
+        return Inertia::render('cost-center/report', [
             'cost_center' => $costCenter,
             'grouped_items' => $groupedItems,
             'totals' => [

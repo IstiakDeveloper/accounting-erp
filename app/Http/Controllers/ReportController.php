@@ -122,7 +122,7 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('Report/TrialBalance', [
+        return Inertia::render('report/trial-balance', [
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
             'trial_balance' => $trialBalance,
@@ -265,7 +265,7 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('Report/BalanceSheet', [
+        return Inertia::render('report/balance-sheet', [
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
             'asset_groups' => $assetGroups,
@@ -424,7 +424,7 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('Report/ProfitLoss', [
+        return Inertia::render('report/profit-loss', [
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
             'income_groups' => $incomeGroups,
@@ -645,7 +645,7 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('Report/CashFlow', [
+        return Inertia::render('report/cash-flow', [
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
             'opening_balance' => $openingBalance,
@@ -826,7 +826,7 @@ class ReportController extends Controller
             }
         }
 
-        return Inertia::render('Report/AccountsReceivableAging', [
+        return Inertia::render('report/accounts-receivable-aging', [
             'customer_aging' => $customerAging,
             'totals' => $totals,
             'aging_periods' => $agingPeriods,
@@ -994,7 +994,7 @@ class ReportController extends Controller
             }
         }
 
-        return Inertia::render('Report/AccountsPayableAging', [
+        return Inertia::render('report/accounts-payable-aging', [
             'supplier_aging' => $supplierAging,
             'totals' => $totals,
             'aging_periods' => $agingPeriods,
@@ -1026,7 +1026,7 @@ class ReportController extends Controller
                 ->orderBy('name')
                 ->get();
 
-            return Inertia::render('Report/SelectParty', [
+            return Inertia::render('report/select-party', [
                 'parties' => $parties,
                 'return_url' => 'report.party_statement',
             ]);
@@ -1132,7 +1132,7 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Report/PartyStatement', [
+        return Inertia::render('report/PartyStatement', [
             'party' => $party,
             'journal_entries' => $journalEntries,
             'opening_balance' => $openingBalance,
@@ -1214,7 +1214,7 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Report/SalesRegister', [
+        return Inertia::render('report/SalesRegister', [
             'vouchers' => $vouchers,
             'total_amount' => $totalAmount,
             'parties' => $parties,
@@ -1300,7 +1300,7 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Report/PurchaseRegister', [
+        return Inertia::render('report/PurchaseRegister', [
             'vouchers' => $vouchers,
             'total_amount' => $totalAmount,
             'parties' => $parties,

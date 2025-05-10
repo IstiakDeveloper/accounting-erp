@@ -30,7 +30,7 @@ class ReportConfigurationController extends Controller
         // Get report types
         $reportTypes = ReportConfiguration::getReportTypes();
 
-        return Inertia::render('ReportConfiguration/Index', [
+        return Inertia::render('report-configuration/index', [
             'grouped_configurations' => $groupedConfigurations,
             'report_types' => $reportTypes,
         ]);
@@ -50,7 +50,7 @@ class ReportConfigurationController extends Controller
         // Get report types
         $reportTypes = ReportConfiguration::getReportTypes();
 
-        return Inertia::render('ReportConfiguration/Create', [
+        return Inertia::render('report-configuration/create', [
             'report_types' => $reportTypes,
         ]);
     }
@@ -115,7 +115,7 @@ class ReportConfigurationController extends Controller
         // Get report types
         $reportTypes = ReportConfiguration::getReportTypes();
 
-        return Inertia::render('ReportConfiguration/Show', [
+        return Inertia::render('report-configuration/show', [
             'report_configuration' => $reportConfiguration,
             'report_types' => $reportTypes,
         ]);
@@ -141,7 +141,7 @@ class ReportConfigurationController extends Controller
         // Get report types
         $reportTypes = ReportConfiguration::getReportTypes();
 
-        return Inertia::render('ReportConfiguration/Edit', [
+        return Inertia::render('report-configuration/edit', [
             'report_configuration' => $reportConfiguration,
             'report_types' => $reportTypes,
         ]);

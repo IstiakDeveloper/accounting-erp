@@ -161,4 +161,5 @@ class BudgetItem extends Model
 
         return ($this->annual_amount - $actual) / $this->annual_amount * 100;
     }
+
 }

@@ -137,4 +137,10 @@ class SystemSetting extends Model
     {
         return self::getSetting($businessId, 'thousands_separator', ',');
     }
+
+    public static function isEnableBankReconciliation($businessId)
+    {
+        return self::getSetting($businessId, 'enable_bank_reconciliation', 'true') === 'true';
+    }
+
 }

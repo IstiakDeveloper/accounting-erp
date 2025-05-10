@@ -8,6 +8,7 @@ use App\Models\FinancialYear;
 use App\Models\LedgerAccount;
 use App\Models\CostCenter;
 use App\Models\AccountGroup;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -36,7 +37,7 @@ class BudgetController extends Controller
             ->orderBy('id', 'desc')
             ->get();
 
-        return Inertia::render('Budget/Index', [
+        return Inertia::render('budget/index', [
             'budgets' => $budgets,
         ]);
     }
@@ -63,7 +64,7 @@ class BudgetController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('Budget/Create', [
+        return Inertia::render('budget/create', [
             'financial_years' => $financialYears,
         ]);
     }
@@ -131,7 +132,7 @@ class BudgetController extends Controller
         // Get monthly budget data
         $monthlyBudget = $budget->getBudgetByMonth();
 
-        return Inertia::render('Budget/Show', [
+        return Inertia::render('budget/show', [
             'budget' => $budget,
             'budget_vs_actual' => $budgetVsActual,
             'monthly_budget' => $monthlyBudget,
@@ -155,7 +156,7 @@ class BudgetController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('Budget/Edit', [
+        return Inertia::render('budget/edit', [
             'budget' => $budget,
             'financial_years' => $financialYears,
         ]);
@@ -234,8 +235,11 @@ class BudgetController extends Controller
      */
     public function items($id)
     {
-        $budget = Budget::with(['financialYear', 'budgetItems.ledgerAccount', 'budgetItems.costCenter'])
-            ->findOrFail($id);
+        $budget = Budget::with([
+            'financialYear',
+            'budgetItems.ledgerAccount.accountGroup',
+            'budgetItems.costCenter'
+        ])->findOrFail($id);
 
         $businessId = session('current_business_id');
 
@@ -247,14 +251,14 @@ class BudgetController extends Controller
         $ledgerAccounts = LedgerAccount::with('accountGroup')
             ->where('business_id', $businessId)
             ->where('is_active', true)
-            ->whereHas('accountGroup', function($query) {
+            ->whereHas('accountGroup', function ($query) {
                 $query->whereIn('nature', ['income', 'expense']);
             })
             ->orderBy('name')
             ->get();
 
         // Group ledger accounts by account group
-        $groupedAccounts = $ledgerAccounts->groupBy(function($account) {
+        $groupedAccounts = $ledgerAccounts->groupBy(function ($account) {
             return $account->accountGroup->nature . ' - ' . $account->accountGroup->name;
         });
 
@@ -267,7 +271,7 @@ class BudgetController extends Controller
                 ->get();
         }
 
-        return Inertia::render('Budget/Items', [
+        return Inertia::render('budget/items', [
             'budget' => $budget,
             'grouped_accounts' => $groupedAccounts,
             'cost_centers' => $costCenters,
@@ -309,6 +313,8 @@ class BudgetController extends Controller
         // Verify the ledger account belongs to this business
         $ledgerAccount = LedgerAccount::with('accountGroup')
             ->findOrFail($request->ledger_account_id);
+
+
 
         if ($ledgerAccount->business_id != $businessId) {
             return back()->withErrors(['error' => 'Invalid ledger account.']);
@@ -526,7 +532,7 @@ class BudgetController extends Controller
         // Group budget items by nature (income/expense)
         $budgetItems = $budget->budgetItems;
 
-        $groupedItems = $budgetItems->groupBy(function($item) {
+        $groupedItems = $budgetItems->groupBy(function ($item) {
             return $item->ledgerAccount->accountGroup->nature;
         });
 
@@ -536,7 +542,7 @@ class BudgetController extends Controller
         $variance = $budget->getVariance();
         $variancePercentage = $budget->getVariancePercentage();
 
-        return Inertia::render('Budget/Report', [
+        return Inertia::render('budget/report', [
             'budget' => $budget,
             'grouped_items' => $groupedItems,
             'totals' => [

@@ -7,6 +7,7 @@ use App\Models\VoucherType;
 use App\Models\LedgerAccount;
 use App\Models\CostCenter;
 use App\Models\Party;
+use App\Models\SystemSetting;
 use App\Models\Voucher;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class RecurringTransactionController extends Controller
             $transaction->next_due_date = $transaction->getNextDueDate();
         }
 
-        return Inertia::render('RecurringTransaction/Index', [
+        return Inertia::render('recurring-transaction/index', [
             'recurring_transactions' => $recurringTransactions,
         ]);
     }
@@ -85,7 +86,7 @@ class RecurringTransactionController extends Controller
                 ->get();
         }
 
-        return Inertia::render('RecurringTransaction/Create', [
+        return Inertia::render('recurring-transaction/create', [
             'voucher_types' => $voucherTypes,
             'grouped_accounts' => $groupedAccounts,
             'parties' => $parties,
@@ -264,7 +265,7 @@ class RecurringTransactionController extends Controller
         // Get next due date
         $nextDueDate = $recurringTransaction->getNextDueDate();
 
-        return Inertia::render('RecurringTransaction/Show', [
+        return Inertia::render('recurring-transaction/show', [
             'recurring_transaction' => $recurringTransaction,
             'template' => $template,
             'generated_vouchers' => $generatedVouchers,
@@ -317,7 +318,7 @@ class RecurringTransactionController extends Controller
                 ->get();
         }
 
-        return Inertia::render('RecurringTransaction/Edit', [
+        return Inertia::render('recurring-transaction/edit', [
             'recurring_transaction' => $recurringTransaction,
             'voucher_types' => $voucherTypes,
             'grouped_accounts' => $groupedAccounts,

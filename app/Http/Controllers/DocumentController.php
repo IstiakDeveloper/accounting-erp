@@ -46,7 +46,7 @@ class DocumentController extends Controller
         $documents = $documents->orderBy('created_at', 'desc')
             ->paginate(20);
 
-        return Inertia::render('Document/Index', [
+        return Inertia::render('document/index', [
             'documents' => $documents,
             'filters' => [
                 'documentable_type' => $documentableType,
@@ -74,7 +74,7 @@ class DocumentController extends Controller
         $documentableId = $request->documentable_id;
         $returnUrl = $request->return_url;
 
-        return Inertia::render('Document/Create', [
+        return Inertia::render('document/create', [
             'documentable_type' => $documentableType,
             'documentable_id' => $documentableId,
             'return_url' => $returnUrl,
@@ -158,7 +158,7 @@ class DocumentController extends Controller
             $documentable = app($document->documentable_type)->find($document->documentable_id);
         }
 
-        return Inertia::render('Document/Show', [
+        return Inertia::render('document/show', [
             'document' => $document,
             'documentable' => $documentable,
             'download_url' => route('document.download', $id),
@@ -177,7 +177,7 @@ class DocumentController extends Controller
             return redirect()->route('document.index');
         }
 
-        return Inertia::render('Document/Edit', [
+        return Inertia::render('document/edit', [
             'document' => $document,
         ]);
     }

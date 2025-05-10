@@ -15,7 +15,7 @@ class CurrencyController extends Controller
     {
         $currencies = Currency::orderBy('code')->get();
 
-        return Inertia::render('Currency/Index', [
+        return Inertia::render('currency/index', [
             'currencies' => $currencies,
         ]);
     }
@@ -25,7 +25,7 @@ class CurrencyController extends Controller
      */
     public function create()
     {
-        return Inertia::render('Currency/Create');
+        return Inertia::render('currency/create');
     }
 
     /**
@@ -79,7 +79,7 @@ class CurrencyController extends Controller
             ];
         }
 
-        return Inertia::render('Currency/Show', [
+        return Inertia::render('currency/show', [
             'currency' => $currency,
             'conversions' => $conversions,
         ]);
@@ -92,7 +92,7 @@ class CurrencyController extends Controller
     {
         $currency = Currency::findOrFail($id);
 
-        return Inertia::render('Currency/Edit', [
+        return Inertia::render('currency/edit', [
             'currency' => $currency,
         ]);
     }
