@@ -61,7 +61,7 @@ interface Voucher {
     voucher_no: string;
     reference_no: string | null;
     date: string;
-    amount: number;
+    total_amount: number;
     description: string | null;
     is_posted: boolean;
     voucher_type: {
@@ -419,7 +419,7 @@ export default function PartyShow({ party, balance, vouchers }: Props) {
                                                 {voucher.description || '-'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-slate-900">
-                                                {formatCurrency(voucher.amount)}
+                                                {formatCurrency(voucher.total_amount)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                                                 {voucher.is_posted ? (

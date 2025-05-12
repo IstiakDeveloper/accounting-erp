@@ -33,7 +33,7 @@ class UserBusinessController extends Controller
         // Get available permissions
         $availablePermissions = UserBusiness::getAvailablePermissions();
 
-        return Inertia::render('UserBusiness/Index', [
+        return Inertia::render('user-business/index', [
             'users' => $users,
             'available_permissions' => $availablePermissions,
         ]);
@@ -53,7 +53,7 @@ class UserBusinessController extends Controller
         // Get available permissions
         $availablePermissions = UserBusiness::getAvailablePermissions();
 
-        return Inertia::render('UserBusiness/Create', [
+        return Inertia::render('user-business/create', [
             'available_permissions' => $availablePermissions,
         ]);
     }
@@ -123,7 +123,7 @@ class UserBusinessController extends Controller
         // Get available permissions
         $availablePermissions = UserBusiness::getAvailablePermissions();
 
-        return Inertia::render('UserBusiness/Edit', [
+        return Inertia::render('user-business/edit', [
             'user' => $user,
             'user_business' => $userBusiness,
             'available_permissions' => $availablePermissions,

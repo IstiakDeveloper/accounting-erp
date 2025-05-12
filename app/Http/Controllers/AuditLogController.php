@@ -86,7 +86,7 @@ class AuditLogController extends Controller
             ->get()
             ->pluck('auditable_type');
 
-        return Inertia::render('AuditLog/Index', [
+        return Inertia::render('audit-log/index', [
             'audit_logs' => $auditLogs,
             'users' => $users,
             'event_types' => $eventTypes,
@@ -126,7 +126,7 @@ class AuditLogController extends Controller
         // Get changes
         $changes = $auditLog->getChanges();
 
-        return Inertia::render('AuditLog/Show', [
+        return Inertia::render('audit-log/show', [
             'audit_log' => $auditLog,
             'auditable' => $auditable,
             'changes' => $changes,

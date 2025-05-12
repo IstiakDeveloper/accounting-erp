@@ -105,7 +105,7 @@ export default function BudgetCreate({ financial_years }: Props) {
                     <option value="">-- Select Financial Year --</option>
                     {financial_years.map((year) => (
                       <option key={year.id} value={year.id}>
-                        {year.name}
+                        {year.start_date.slice(0, 10)} - {year.end_date.slice(0,10)}
                       </option>
                     ))}
                   </select>

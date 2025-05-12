@@ -87,12 +87,12 @@ export default function BankReconciliationReconcile({
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
+        const formattedNumber = new Intl.NumberFormat('en-US', {
             minimumFractionDigits: 2,
-            maximumFractionDigits: 2
+            maximumFractionDigits: 2,
         }).format(amount);
+
+        return `৳${formattedNumber}`;
     };
 
     const formatDate = (dateString: string | null) => {
@@ -135,7 +135,7 @@ export default function BankReconciliationReconcile({
         // Apply search filter
         const matchesSearch = searchTerm === '' ||
             (entry.narration && entry.narration.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            entry.voucher.voucher_number.toLowerCase().includes(searchTerm.toLowerCase());
+            (entry.voucher?.voucher_number && entry.voucher.voucher_number.toLowerCase().includes(searchTerm.toLowerCase()));
 
         // Apply debit/credit filter
         const matchesType =
@@ -272,8 +272,8 @@ export default function BankReconciliationReconcile({
                                     type="button"
                                     onClick={() => setShowDebits(!showDebits)}
                                     className={`inline-flex items-center px-3 py-2 border rounded-md text-sm leading-4 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${showDebits
-                                            ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200'
-                                            : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
+                                        ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200'
+                                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
                                         }`}
                                 >
                                     <ArrowDown className={`h-4 w-4 mr-1 ${showDebits ? 'text-blue-600' : 'text-gray-500'}`} />
@@ -283,8 +283,8 @@ export default function BankReconciliationReconcile({
                                     type="button"
                                     onClick={() => setShowCredits(!showCredits)}
                                     className={`inline-flex items-center px-3 py-2 border rounded-md text-sm leading-4 font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${showCredits
-                                            ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200'
-                                            : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
+                                        ? 'bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-200'
+                                        : 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200'
                                         }`}
                                 >
                                     <ArrowUp className={`h-4 w-4 mr-1 ${showCredits ? 'text-blue-600' : 'text-gray-500'}`} />
@@ -298,21 +298,6 @@ export default function BankReconciliationReconcile({
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => toggleSort('date')}>
-                                        <div className="flex items-center">
-                                            Date
-                                            {sortBy === 'date' && (
-                                                sortDirection === 'asc' ? (
-                                                    <ChevronsUp className="h-4 w-4 ml-1" />
-                                                ) : (
-                                                    <ChevronsDown className="h-4 w-4 ml-1" />
-                                                )
-                                            )}
-                                        </div>
-                                    </th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Reference
-                                    </th>
                                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Description
                                     </th>
@@ -347,14 +332,104 @@ export default function BankReconciliationReconcile({
                                                 {formatDate(entry.date)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <Link
-                                                    href={route('voucher.show', entry.voucher_id)}
+                                                {entry.voucher ? (
+                                                    <Link
+                                                        href={route('voucher.show', entry.voucher_id)}
+                                                        className="text-blue-600 hover:text-blue-900"
+                                                    >
+                                                        {entry.voucher.voucher_type?.code || entry.voucher.voucher_type?.name || '-'}
+                                                        {' '}
+                                                        {entry.voucher.voucher_number}
+                                                    </Link>
+                                                ) : (
+                                                    <span>-</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                                                {entry.narration || '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                                                {entry.debit_amount > 0 ? (
+                                                    <span className="text-green-600">{formatCurrency(entry.debit_amount)}</span>
+                                                ) : (
+                                                    <span className="text-red-600">({formatCurrency(entry.credit_amount)})</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                <button
+                                                    onClick={() => handleAddItem(entry.id)}
                                                     className="text-blue-600 hover:text-blue-900"
+                                                    title="Add to reconciliation"
                                                 >
-                                                    {entry.voucher.voucher_type.code || entry.voucher.voucher_type.name}
-                                                    {' '}
-                                                    {entry.voucher.voucher_number}
-                                                </Link>
+                                                    <Plus className="h-5 w-5" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Reconciled Transactions */}
+                <div className="bg-white shadow rounded-lg">
+                    <div className="px-6 py-5 border-b border-gray-200">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900 flex items-center">
+                            Reconciled Transactions
+                            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {reconciled_entries.length}
+                            </span>
+                        </h3>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Date
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Reference
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Description
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Amount
+                                    </th>
+                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <span className="sr-only">Actions</span>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {reconciled_entries.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                                            No reconciled transactions yet
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    reconciled_entries.map((entry) => (
+                                        <tr key={entry.id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {formatDate(entry.date)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {entry.voucher ? (
+                                                    <Link
+                                                        href={route('voucher.show', entry.voucher_id)}
+                                                        className="text-blue-600 hover:text-blue-900"
+                                                    >
+                                                        {entry.voucher.voucher_type?.code || entry.voucher.voucher_type?.name || '-'}
+                                                        {' '}
+                                                        {entry.voucher.voucher_number}
+                                                    </Link>
+                                                ) : (
+                                                    <span>-</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
                                                 {entry.narration || '-'}
@@ -370,6 +445,7 @@ export default function BankReconciliationReconcile({
                                                 <button
                                                     onClick={() => handleRemoveItem(entry.id)}
                                                     className="text-red-600 hover:text-red-900"
+                                                    title="Remove from reconciliation"
                                                 >
                                                     <Trash2 className="h-5 w-5" />
                                                 </button>
@@ -384,12 +460,17 @@ export default function BankReconciliationReconcile({
                                         Total
                                     </td>
                                     <td className="px-6 py-3 text-sm font-medium text-right">
-                                        {formatCurrency(reconciled_entries.reduce((sum, entry) => {
-                                            return sum + (entry.debit_amount > 0 ? entry.debit_amount : -entry.credit_amount);
-                                        }, 0))}
+                                        {formatCurrency(
+                                            reconciled_entries.reduce((sum, entry) => {
+                                                const debit = parseFloat(entry.debit_amount) || 0;
+                                                const credit = parseFloat(entry.credit_amount) || 0;
+                                                return sum + (debit > 0 ? debit : -credit);
+                                            }, 0)
+                                        )}
                                     </td>
                                     <td></td>
                                 </tr>
+
                             </tfoot>
                         </table>
                     </div>

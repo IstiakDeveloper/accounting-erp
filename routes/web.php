@@ -73,7 +73,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/', [BusinessController::class, 'store'])->name('store');
         Route::get('/{id}', [BusinessController::class, 'show'])->name('show');
         Route::get('/{id}/edit', [BusinessController::class, 'edit'])->name('edit');
-        Route::put('/{id}', [BusinessController::class, 'update'])->name('update');
+        Route::post('/{id}', [BusinessController::class, 'update'])->name('update');
         Route::delete('/{id}', [BusinessController::class, 'destroy'])->name('destroy');
     });
 
@@ -97,11 +97,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [FinancialYearController::class, 'store'])->name('store');
             Route::get('/{id}', [FinancialYearController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [FinancialYearController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [FinancialYearController::class, 'update'])->name('update');
+            Route::post('/{id}', [FinancialYearController::class, 'update'])->name('update');
             Route::delete('/{id}', [FinancialYearController::class, 'destroy'])->name('destroy');
-            Route::put('/{id}/set-current', [FinancialYearController::class, 'setCurrent'])->name('set_current');
-            Route::put('/{id}/lock', [FinancialYearController::class, 'lock'])->name('lock');
-            Route::put('/{id}/unlock', [FinancialYearController::class, 'unlock'])->name('unlock');
+            Route::post('/{id}/set-current', [FinancialYearController::class, 'setCurrent'])->name('set_current');
+            Route::post('/{id}/lock', [FinancialYearController::class, 'lock'])->name('lock');
+            Route::post('/{id}/unlock', [FinancialYearController::class, 'unlock'])->name('unlock');
         });
 
         // Account Groups
@@ -111,7 +111,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [AccountGroupController::class, 'store'])->name('store');
             Route::get('/{id}', [AccountGroupController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [AccountGroupController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [AccountGroupController::class, 'update'])->name('update');
+            Route::post('/{id}', [AccountGroupController::class, 'update'])->name('update');
             Route::delete('/{id}', [AccountGroupController::class, 'destroy'])->name('destroy');
         });
 
@@ -134,7 +134,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [PartyController::class, 'store'])->name('store');
             Route::get('/{id}', [PartyController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [PartyController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [PartyController::class, 'update'])->name('update');
+            Route::post('/{id}', [PartyController::class, 'update'])->name('update');
             Route::delete('/{id}', [PartyController::class, 'destroy'])->name('destroy');
             Route::get('/{id}/ledger', [PartyController::class, 'ledger'])->name('ledger');
         });
@@ -146,7 +146,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [VoucherTypeController::class, 'store'])->name('store');
             Route::get('/{id}', [VoucherTypeController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [VoucherTypeController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [VoucherTypeController::class, 'update'])->name('update');
+            Route::post('/{id}', [VoucherTypeController::class, 'update'])->name('update');
             Route::delete('/{id}', [VoucherTypeController::class, 'destroy'])->name('destroy');
         });
 
@@ -157,10 +157,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [VoucherController::class, 'store'])->name('store');
             Route::get('/{id}', [VoucherController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [VoucherController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [VoucherController::class, 'update'])->name('update');
+            Route::post('/{id}', [VoucherController::class, 'update'])->name('update');
             Route::delete('/{id}', [VoucherController::class, 'destroy'])->name('destroy');
-            Route::put('/{id}/post', [VoucherController::class, 'post'])->name('post');
-            Route::put('/{id}/unpost', [VoucherController::class, 'unpost'])->name('unpost');
+            Route::post('/{id}/post', [VoucherController::class, 'post'])->name('post');
+            Route::post('/{id}/unpost', [VoucherController::class, 'unpost'])->name('unpost');
             Route::get('/{id}/duplicate', [VoucherController::class, 'duplicate'])->name('duplicate');
             Route::get('/{id}/print', [VoucherController::class, 'print'])->name('print');
         });
@@ -182,7 +182,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [CostCenterController::class, 'store'])->name('store');
             Route::get('/{id}', [CostCenterController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [CostCenterController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [CostCenterController::class, 'update'])->name('update');
+            Route::post('/{id}', [CostCenterController::class, 'update'])->name('update');
             Route::delete('/{id}', [CostCenterController::class, 'destroy'])->name('destroy');
             Route::get('/{id}/report', [CostCenterController::class, 'report'])->name('report');
         });
@@ -194,11 +194,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [BudgetController::class, 'store'])->name('store');
             Route::get('/{id}', [BudgetController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [BudgetController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [BudgetController::class, 'update'])->name('update');
+            Route::post('/{id}', [BudgetController::class, 'update'])->name('update');
             Route::delete('/{id}', [BudgetController::class, 'destroy'])->name('destroy');
             Route::get('/{id}/items', [BudgetController::class, 'items'])->name('items');
             Route::post('/{id}/items', [BudgetController::class, 'addItem'])->name('add_item');
-            Route::put('/{id}/items/{itemId}', [BudgetController::class, 'updateItem'])->name('update_item');
+            Route::post('/{id}/items/{itemId}', [BudgetController::class, 'updateItem'])->name('update_item');
             Route::delete('/{id}/items/{itemId}', [BudgetController::class, 'deleteItem'])->name('delete_item');
             Route::get('/{id}/report', [BudgetController::class, 'report'])->name('report');
         });
@@ -210,7 +210,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [RecurringTransactionController::class, 'store'])->name('store');
             Route::get('/{id}', [RecurringTransactionController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [RecurringTransactionController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [RecurringTransactionController::class, 'update'])->name('update');
+            Route::post('/{id}', [RecurringTransactionController::class, 'update'])->name('update');
             Route::delete('/{id}', [RecurringTransactionController::class, 'destroy'])->name('destroy');
             Route::post('/{id}/generate', [RecurringTransactionController::class, 'generate'])->name('generate');
             Route::post('/process-all', [RecurringTransactionController::class, 'processAll'])->name('process_all');
@@ -225,8 +225,8 @@ Route::middleware('auth')->group(function () {
             Route::get('/{id}/reconcile', [BankReconciliationController::class, 'reconcile'])->name('reconcile');
             Route::post('/{id}/add-item', [BankReconciliationController::class, 'addItem'])->name('add_item');
             Route::post('/{id}/remove-item', [BankReconciliationController::class, 'removeItem'])->name('remove_item');
-            Route::put('/{id}/complete', [BankReconciliationController::class, 'complete'])->name('complete');
-            Route::put('/{id}/reopen', [BankReconciliationController::class, 'reopen'])->name('reopen');
+            Route::post('/{id}/complete', [BankReconciliationController::class, 'complete'])->name('complete');
+            Route::post('/{id}/reopen', [BankReconciliationController::class, 'reopen'])->name('reopen');
             Route::delete('/{id}', [BankReconciliationController::class, 'destroy'])->name('destroy');
         });
 
@@ -237,7 +237,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [TaxRateController::class, 'store'])->name('store');
             Route::get('/{id}', [TaxRateController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [TaxRateController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [TaxRateController::class, 'update'])->name('update');
+            Route::post('/{id}', [TaxRateController::class, 'update'])->name('update');
             Route::delete('/{id}', [TaxRateController::class, 'destroy'])->name('destroy');
             Route::post('/calculate', [TaxRateController::class, 'calculate'])->name('calculate');
         });
@@ -249,9 +249,9 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [CurrencyController::class, 'store'])->name('store');
             Route::get('/{id}', [CurrencyController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [CurrencyController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [CurrencyController::class, 'update'])->name('update');
+            Route::post('/{id}', [CurrencyController::class, 'update'])->name('update');
             Route::delete('/{id}', [CurrencyController::class, 'destroy'])->name('destroy');
-            Route::put('/{id}/set-default', [CurrencyController::class, 'setDefault'])->name('set_default');
+            Route::post('/{id}/set-default', [CurrencyController::class, 'setDefault'])->name('set_default');
             Route::post('/convert', [CurrencyController::class, 'convert'])->name('convert');
         });
 
@@ -262,7 +262,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [DocumentController::class, 'store'])->name('store');
             Route::get('/{id}', [DocumentController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [DocumentController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [DocumentController::class, 'update'])->name('update');
+            Route::post('/{id}', [DocumentController::class, 'update'])->name('update');
             Route::delete('/{id}', [DocumentController::class, 'destroy'])->name('destroy');
             Route::get('/{id}/download', [DocumentController::class, 'download'])->name('download');
         });
@@ -274,9 +274,9 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [ReportConfigurationController::class, 'store'])->name('store');
             Route::get('/{id}', [ReportConfigurationController::class, 'show'])->name('show');
             Route::get('/{id}/edit', [ReportConfigurationController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [ReportConfigurationController::class, 'update'])->name('update');
+            Route::post('/{id}', [ReportConfigurationController::class, 'update'])->name('update');
             Route::delete('/{id}', [ReportConfigurationController::class, 'destroy'])->name('destroy');
-            Route::put('/{id}/set-default', [ReportConfigurationController::class, 'setDefault'])->name('set_default');
+            Route::post('/{id}/set-default', [ReportConfigurationController::class, 'setDefault'])->name('set_default');
         });
 
         // Reports
@@ -299,13 +299,13 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [FinancialRatioController::class, 'store'])->name('store');
             Route::get('/{id}', [FinancialRatioController::class, 'show'])->name('show');
             Route::delete('/{id}', [FinancialRatioController::class, 'destroy'])->name('destroy');
-            Route::put('/{id}/recalculate', [FinancialRatioController::class, 'recalculate'])->name('recalculate');
+            Route::post('/{id}/recalculate', [FinancialRatioController::class, 'recalculate'])->name('recalculate');
         });
 
         // System Settings
         Route::prefix('system-setting')->name('system_setting.')->group(function () {
             Route::get('/', [SystemSettingController::class, 'index'])->name('index');
-            Route::put('/', [SystemSettingController::class, 'update'])->name('update');
+            Route::post('/', [SystemSettingController::class, 'update'])->name('update');
             Route::delete('/logo', [SystemSettingController::class, 'deleteLogo'])->name('delete_logo');
             Route::delete('/favicon', [SystemSettingController::class, 'deleteFavicon'])->name('delete_favicon');
         });
@@ -316,19 +316,19 @@ Route::middleware('auth')->group(function () {
             Route::get('/create', [UserBusinessController::class, 'create'])->name('create');
             Route::post('/', [UserBusinessController::class, 'store'])->name('store');
             Route::get('/{id}/edit', [UserBusinessController::class, 'edit'])->name('edit');
-            Route::put('/{id}', [UserBusinessController::class, 'update'])->name('update');
+            Route::post('/{id}', [UserBusinessController::class, 'update'])->name('update');
             Route::delete('/{id}', [UserBusinessController::class, 'destroy'])->name('destroy');
-            Route::put('/{id}/make-owner', [UserBusinessController::class, 'makeOwner'])->name('make_owner');
-            Route::put('/{id}/make-admin', [UserBusinessController::class, 'makeAdmin'])->name('make_admin');
-            Route::put('/{id}/remove-admin', [UserBusinessController::class, 'removeAdmin'])->name('remove_admin');
-            Route::put('/{id}/update-permissions', [UserBusinessController::class, 'updatePermissions'])->name('update_permissions');
+            Route::post('/{id}/make-owner', [UserBusinessController::class, 'makeOwner'])->name('make_owner');
+            Route::post('/{id}/make-admin', [UserBusinessController::class, 'makeAdmin'])->name('make_admin');
+            Route::post('/{id}/remove-admin', [UserBusinessController::class, 'removeAdmin'])->name('remove_admin');
+            Route::post('/{id}/update-permissions', [UserBusinessController::class, 'updatePermissions'])->name('update_permissions');
         });
 
         // Notifications
         Route::prefix('notification')->name('notification.')->group(function () {
             Route::get('/', [NotificationController::class, 'index'])->name('index');
-            Route::put('/{id}/mark-read', [NotificationController::class, 'markRead'])->name('mark_read');
-            Route::put('/mark-all-read', [NotificationController::class, 'markAllRead'])->name('mark_all_read');
+            Route::post('/{id}/mark-read', [NotificationController::class, 'markRead'])->name('mark_read');
+            Route::post('/mark-all-read', [NotificationController::class, 'markAllRead'])->name('mark_all_read');
             Route::delete('/{id}', [NotificationController::class, 'destroy'])->name('destroy');
             Route::delete('/clear-all', [NotificationController::class, 'clearAll'])->name('clear_all');
         });
@@ -346,7 +346,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/', [ApiTokenController::class, 'store'])->name('store');
             Route::get('/{id}', [ApiTokenController::class, 'show'])->name('show');
             Route::delete('/{id}', [ApiTokenController::class, 'destroy'])->name('destroy');
-            Route::put('/{id}/revoke', [ApiTokenController::class, 'revoke'])->name('revoke');
+            Route::post('/{id}/revoke', [ApiTokenController::class, 'revoke'])->name('revoke');
         });
     });
 });

@@ -265,6 +265,8 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
+
+
         return Inertia::render('report/balance-sheet', [
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
@@ -1132,7 +1134,7 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('report/PartyStatement', [
+        return Inertia::render('report/party-statement', [
             'party' => $party,
             'journal_entries' => $journalEntries,
             'opening_balance' => $openingBalance,
@@ -1214,7 +1216,7 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('report/SalesRegister', [
+        return Inertia::render('report/sales-register', [
             'vouchers' => $vouchers,
             'total_amount' => $totalAmount,
             'parties' => $parties,
@@ -1300,7 +1302,7 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('report/PurchaseRegister', [
+        return Inertia::render('report/purchase-register', [
             'vouchers' => $vouchers,
             'total_amount' => $totalAmount,
             'parties' => $parties,

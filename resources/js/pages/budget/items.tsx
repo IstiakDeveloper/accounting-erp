@@ -290,11 +290,13 @@ export default function BudgetItems({ budget, grouped_accounts, cost_centers }: 
 
     // Format currency
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
+        const validAmount = isNaN(amount) ? 0 : amount;
+        const formattedNumber = new Intl.NumberFormat('en-US', {
             minimumFractionDigits: 2,
-        }).format(amount);
+            maximumFractionDigits: 2,
+        }).format(validAmount);
+
+        return `৳${formattedNumber}`;
     };
 
     return (

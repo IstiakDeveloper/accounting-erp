@@ -34,7 +34,7 @@ class SystemSettingController extends Controller
         // Get currencies for reference
         $currencies = Currency::orderBy('code')->get();
 
-        return Inertia::render('SystemSetting/Index', [
+        return Inertia::render('system-setting/index', [
             'settings' => $settings,
             'voucher_types' => $voucherTypes,
             'currencies' => $currencies,

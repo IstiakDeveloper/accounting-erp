@@ -26,7 +26,7 @@ class FinancialRatioController extends Controller
             ->orderBy('calculation_date', 'desc')
             ->get();
 
-        return Inertia::render('FinancialRatio/Index', [
+        return Inertia::render('financial-ratio/index', [
             'financial_ratios' => $financialRatios,
         ]);
     }
@@ -47,7 +47,7 @@ class FinancialRatioController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
-        return Inertia::render('FinancialRatio/Create', [
+        return Inertia::render('financial-ratio/create', [
             'financial_years' => $financialYears,
             'today' => date('Y-m-d'),
         ]);
@@ -119,7 +119,7 @@ class FinancialRatioController extends Controller
             return redirect()->route('financial_ratio.index');
         }
 
-        return Inertia::render('FinancialRatio/Show', [
+        return Inertia::render('financial-ratio/show', [
             'financial_ratio' => $financialRatio,
         ]);
     }
