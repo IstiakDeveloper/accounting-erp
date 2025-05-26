@@ -22,7 +22,9 @@ interface LedgerAccount {
         id: number;
         name: string;
     };
-  interface CostCenter {
+}
+
+interface CostCenter {
     id: number;
     name: string;
     code: string;
@@ -383,8 +385,8 @@ export default function VoucherEdit({
                                             value={item.ledger_account_id}
                                             onChange={(e) => handleItemChange(index, 'ledger_account_id', e.target.value)}
                                             className={`block w-full px-3 py-2 border rounded-md shadow-sm text-sm ${errors.items && errors.items[index]?.ledger_account_id
-                                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                                                    : 'border-slate-300 focus:ring-blue-500 focus:border-blue-500'
+                                                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                                                : 'border-slate-300 focus:ring-blue-500 focus:border-blue-500'
                                                 }`}
                                             required
                                         >
@@ -429,8 +431,8 @@ export default function VoucherEdit({
                                                 value={item.debit_amount}
                                                 onChange={(e) => handleItemChange(index, 'debit_amount', e.target.value)}
                                                 className={`block w-full pl-8 px-3 py-2 border rounded-md shadow-sm text-sm ${errors.items && errors.items[index]?.debit_amount
-                                                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                                                        : 'border-slate-300 focus:ring-blue-500 focus:border-blue-500'
+                                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                                                    : 'border-slate-300 focus:ring-blue-500 focus:border-blue-500'
                                                     }`}
                                                 placeholder="0.00"
                                                 step="0.01"
@@ -452,8 +454,8 @@ export default function VoucherEdit({
                                                 value={item.credit_amount}
                                                 onChange={(e) => handleItemChange(index, 'credit_amount', e.target.value)}
                                                 className={`block w-full pl-8 px-3 py-2 border rounded-md shadow-sm text-sm ${errors.items && errors.items[index]?.credit_amount
-                                                        ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                                                        : 'border-slate-300 focus:ring-blue-500 focus:border-blue-500'
+                                                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                                                    : 'border-slate-300 focus:ring-blue-500 focus:border-blue-500'
                                                     }`}
                                                 placeholder="0.00"
                                                 step="0.01"

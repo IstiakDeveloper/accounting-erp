@@ -186,3 +186,4 @@ export default function VoucherTypeSelect({ voucher_types }: Props) {
       </div>
     </AppLayout>
   );
+}

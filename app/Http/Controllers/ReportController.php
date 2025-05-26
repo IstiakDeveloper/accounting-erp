@@ -197,46 +197,68 @@ class ReportController extends Controller
                     ->first();
             } else if ($comparativePeriod == 'previous_month') {
                 $comparativeDate = Carbon::parse($asOfDate)->subMonth()->format('Y-m-d');
+                $comparativeFinancialYear = $financialYear; // Same financial year
             } else if ($comparativePeriod == 'previous_quarter') {
                 $comparativeDate = Carbon::parse($asOfDate)->subMonths(3)->format('Y-m-d');
+                $comparativeFinancialYear = $financialYear; // Same financial year
             }
         }
 
-        // Get account groups for assets and liabilities
-        $assetGroups = AccountGroup::with('children.children.children')
+        // Get account groups for assets, liabilities, and equity
+        $assetGroups = AccountGroup::with([
+            'children' => function ($query) {
+                $query->with([
+                    'children' => function ($subQuery) {
+                        $subQuery->with('children')->orderBy('sequence');
+                    }
+                ])->orderBy('sequence');
+            }
+        ])
             ->where('business_id', $businessId)
             ->where('nature', 'assets')
             ->whereNull('parent_id')
             ->orderBy('sequence')
             ->get();
 
-        $liabilityGroups = AccountGroup::with('children.children.children')
+        $liabilityGroups = AccountGroup::with([
+            'children' => function ($query) {
+                $query->with([
+                    'children' => function ($subQuery) {
+                        $subQuery->with('children')->orderBy('sequence');
+                    }
+                ])->orderBy('sequence');
+            }
+        ])
             ->where('business_id', $businessId)
             ->where('nature', 'liabilities')
             ->whereNull('parent_id')
             ->orderBy('sequence')
             ->get();
 
-        $equityGroups = AccountGroup::with('children.children.children')
+        $equityGroups = AccountGroup::with([
+            'children' => function ($query) {
+                $query->with([
+                    'children' => function ($subQuery) {
+                        $subQuery->with('children')->orderBy('sequence');
+                    }
+                ])->orderBy('sequence');
+            }
+        ])
             ->where('business_id', $businessId)
             ->where('nature', 'equity')
             ->whereNull('parent_id')
             ->orderBy('sequence')
             ->get();
 
+        // Calculate individual balances for current period
+        $assetGroups = $this->calculateAccountGroupBalances($businessId, $asOfDate, $financialYearId, $assetGroups, $showZeroBalances);
+        $liabilityGroups = $this->calculateAccountGroupBalances($businessId, $asOfDate, $financialYearId, $liabilityGroups, $showZeroBalances);
+        $equityGroups = $this->calculateAccountGroupBalances($businessId, $asOfDate, $financialYearId, $equityGroups, $showZeroBalances);
+
         // Get net profit (or loss)
         $incomeTotals = $this->calculateTotals($businessId, 'income', $asOfDate, $financialYearId);
         $expenseTotals = $this->calculateTotals($businessId, 'expense', $asOfDate, $financialYearId);
         $netProfit = $incomeTotals['total'] - $expenseTotals['total'];
-
-        // Get comparative net profit if needed
-        $comparativeNetProfit = null;
-
-        if ($showComparative && $comparativeDate) {
-            $comparativeIncomeTotals = $this->calculateTotals($businessId, 'income', $comparativeDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null);
-            $comparativeExpenseTotals = $this->calculateTotals($businessId, 'expense', $comparativeDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null);
-            $comparativeNetProfit = $comparativeIncomeTotals['total'] - $comparativeExpenseTotals['total'];
-        }
 
         // Calculate totals for assets, liabilities, and equity
         $assetTotals = $this->calculateTotals($businessId, 'assets', $asOfDate, $financialYearId);
@@ -246,15 +268,77 @@ class ReportController extends Controller
         // Add net profit to equity
         $equityTotals['total'] += $netProfit;
 
-        // Calculate comparative totals if needed
+        // Initialize comparative variables
+        $comparativeAssetGroups = null;
+        $comparativeLiabilityGroups = null;
+        $comparativeEquityGroups = null;
         $comparativeAssetTotals = null;
         $comparativeLiabilityTotals = null;
         $comparativeEquityTotals = null;
+        $comparativeNetProfit = null;
 
-        if ($showComparative && $comparativeDate) {
-            $comparativeAssetTotals = $this->calculateTotals($businessId, 'assets', $comparativeDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null);
-            $comparativeLiabilityTotals = $this->calculateTotals($businessId, 'liabilities', $comparativeDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null);
-            $comparativeEquityTotals = $this->calculateTotals($businessId, 'equity', $comparativeDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null);
+        // Calculate comparative data if needed
+        if ($showComparative && $comparativeDate && $comparativeFinancialYear) {
+            // Get comparative account groups
+            $comparativeAssetGroups = AccountGroup::with([
+                'children' => function ($query) {
+                    $query->with([
+                        'children' => function ($subQuery) {
+                            $subQuery->with('children')->orderBy('sequence');
+                        }
+                    ])->orderBy('sequence');
+                }
+            ])
+                ->where('business_id', $businessId)
+                ->where('nature', 'assets')
+                ->whereNull('parent_id')
+                ->orderBy('sequence')
+                ->get();
+
+            $comparativeLiabilityGroups = AccountGroup::with([
+                'children' => function ($query) {
+                    $query->with([
+                        'children' => function ($subQuery) {
+                            $subQuery->with('children')->orderBy('sequence');
+                        }
+                    ])->orderBy('sequence');
+                }
+            ])
+                ->where('business_id', $businessId)
+                ->where('nature', 'liabilities')
+                ->whereNull('parent_id')
+                ->orderBy('sequence')
+                ->get();
+
+            $comparativeEquityGroups = AccountGroup::with([
+                'children' => function ($query) {
+                    $query->with([
+                        'children' => function ($subQuery) {
+                            $subQuery->with('children')->orderBy('sequence');
+                        }
+                    ])->orderBy('sequence');
+                }
+            ])
+                ->where('business_id', $businessId)
+                ->where('nature', 'equity')
+                ->whereNull('parent_id')
+                ->orderBy('sequence')
+                ->get();
+
+            // Calculate comparative balances
+            $comparativeAssetGroups = $this->calculateAccountGroupBalances($businessId, $comparativeDate, $comparativeFinancialYear->id, $comparativeAssetGroups, $showZeroBalances);
+            $comparativeLiabilityGroups = $this->calculateAccountGroupBalances($businessId, $comparativeDate, $comparativeFinancialYear->id, $comparativeLiabilityGroups, $showZeroBalances);
+            $comparativeEquityGroups = $this->calculateAccountGroupBalances($businessId, $comparativeDate, $comparativeFinancialYear->id, $comparativeEquityGroups, $showZeroBalances);
+
+            // Calculate comparative totals
+            $comparativeAssetTotals = $this->calculateTotals($businessId, 'assets', $comparativeDate, $comparativeFinancialYear->id);
+            $comparativeLiabilityTotals = $this->calculateTotals($businessId, 'liabilities', $comparativeDate, $comparativeFinancialYear->id);
+            $comparativeEquityTotals = $this->calculateTotals($businessId, 'equity', $comparativeDate, $comparativeFinancialYear->id);
+
+            // Calculate comparative net profit
+            $comparativeIncomeTotals = $this->calculateTotals($businessId, 'income', $comparativeDate, $comparativeFinancialYear->id);
+            $comparativeExpenseTotals = $this->calculateTotals($businessId, 'expense', $comparativeDate, $comparativeFinancialYear->id);
+            $comparativeNetProfit = $comparativeIncomeTotals['total'] - $comparativeExpenseTotals['total'];
 
             // Add comparative net profit to equity
             $comparativeEquityTotals['total'] += $comparativeNetProfit;
@@ -264,8 +348,6 @@ class ReportController extends Controller
         $financialYears = FinancialYear::where('business_id', $businessId)
             ->orderBy('start_date', 'desc')
             ->get();
-
-
 
         return Inertia::render('report/balance-sheet', [
             'financial_year' => $financialYear,
@@ -277,6 +359,9 @@ class ReportController extends Controller
             'liability_totals' => $liabilityTotals,
             'equity_totals' => $equityTotals,
             'net_profit' => $netProfit,
+            'comparative_asset_groups' => $comparativeAssetGroups,
+            'comparative_liability_groups' => $comparativeLiabilityGroups,
+            'comparative_equity_groups' => $comparativeEquityGroups,
             'comparative_asset_totals' => $comparativeAssetTotals,
             'comparative_liability_totals' => $comparativeLiabilityTotals,
             'comparative_equity_totals' => $comparativeEquityTotals,
@@ -297,6 +382,248 @@ class ReportController extends Controller
         ]);
     }
 
+    private function calculateAccountGroupBalances($businessId, $asOfDate, $financialYearId, $groups, $showZeroBalances = false)
+    {
+        foreach ($groups as $group) {
+            // Get direct ledger accounts for this group only
+            $group->ledger_accounts = $this->getLedgerAccountsWithBalances($businessId, $group->id, $asOfDate, $financialYearId, $showZeroBalances);
+
+            // Calculate balance for direct ledger accounts only
+            $directBalance = $group->ledger_accounts->sum('balance');
+
+            // Calculate balances for children recursively
+            $childrenBalance = 0;
+            if ($group->children && $group->children->count() > 0) {
+                $group->children = $this->calculateAccountGroupBalances($businessId, $asOfDate, $financialYearId, $group->children, $showZeroBalances);
+                $childrenBalance = $group->children->sum('balance');
+            }
+
+            // Total balance = direct accounts + children groups
+            $group->balance = $directBalance + $childrenBalance;
+        }
+
+        return $groups;
+    }
+
+    private function getAccountGroupBalance($businessId, $accountGroupId, $asOfDate, $financialYearId)
+    {
+        // Get all ledger accounts under this group (including children groups)
+        $accountGroupIds = $this->getAllChildGroupIds($businessId, $accountGroupId);
+        $accountGroupIds[] = $accountGroupId; // Include the parent group itself
+
+        // Calculate total from journal entries
+        $query = JournalEntry::where('business_id', $businessId)
+            ->whereIn('ledger_account_id', function ($query) use ($accountGroupIds) {
+                $query->select('id')
+                    ->from('ledger_accounts')
+                    ->whereIn('account_group_id', $accountGroupIds)
+                    ->where('is_active', true);
+            })
+            ->where('date', '<=', $asOfDate);
+
+        if ($financialYearId) {
+            $query->where('financial_year_id', $financialYearId);
+        }
+
+        $result = $query->selectRaw('
+        SUM(debit_amount) as total_debit,
+        SUM(credit_amount) as total_credit
+    ')->first();
+
+        $totalDebit = $result->total_debit ?? 0;
+        $totalCredit = $result->total_credit ?? 0;
+
+        // Get opening balances
+        $openingBalances = LedgerAccount::whereIn('account_group_id', $accountGroupIds)
+            ->where('is_active', true)
+            ->selectRaw('
+            SUM(CASE WHEN opening_balance_type = "debit" THEN opening_balance ELSE 0 END) as opening_debit,
+            SUM(CASE WHEN opening_balance_type = "credit" THEN opening_balance ELSE 0 END) as opening_credit
+        ')
+            ->first();
+
+        $openingDebit = $openingBalances->opening_debit ?? 0;
+        $openingCredit = $openingBalances->opening_credit ?? 0;
+
+        $totalDebit += $openingDebit;
+        $totalCredit += $openingCredit;
+
+        // For assets: Debit balance is positive
+        // For liabilities and equity: Credit balance is positive
+        $accountGroup = AccountGroup::find($accountGroupId);
+        if ($accountGroup && $accountGroup->nature === 'assets') {
+            return $totalDebit - $totalCredit;
+        } else {
+            return $totalCredit - $totalDebit;
+        }
+    }
+
+    private function getLedgerAccountsWithBalances($businessId, $accountGroupId, $asOfDate, $financialYearId, $showZeroBalances = false)
+    {
+        $ledgerAccounts = LedgerAccount::where('business_id', $businessId)
+            ->where('account_group_id', $accountGroupId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        foreach ($ledgerAccounts as $account) {
+            $account->balance = $this->getLedgerAccountBalance($businessId, $account->id, $asOfDate, $financialYearId);
+        }
+
+        // Filter zero balances if not showing them
+        if (!$showZeroBalances) {
+            $ledgerAccounts = $ledgerAccounts->filter(function ($account) {
+                return abs($account->balance) > 0.01; // Consider very small amounts as zero
+            });
+        }
+
+        return $ledgerAccounts->values();
+    }
+
+    private function getLedgerAccountBalance($businessId, $ledgerAccountId, $asOfDate, $financialYearId)
+    {
+        // Get the ledger account to check its nature
+        $ledgerAccount = LedgerAccount::with('accountGroup')->find($ledgerAccountId);
+        if (!$ledgerAccount) {
+            return 0;
+        }
+
+        // Calculate from journal entries
+        $query = JournalEntry::where('business_id', $businessId)
+            ->where('ledger_account_id', $ledgerAccountId)
+            ->where('date', '<=', $asOfDate);
+
+        if ($financialYearId) {
+            $query->where('financial_year_id', $financialYearId);
+        }
+
+        $result = $query->selectRaw('
+        SUM(debit_amount) as total_debit,
+        SUM(credit_amount) as total_credit
+    ')->first();
+
+        $totalDebit = $result->total_debit ?? 0;
+        $totalCredit = $result->total_credit ?? 0;
+
+        // Add opening balance from ledger account (শুধু journal entries তে opening balance entry না থাকলে)
+        // Check if there's an opening balance entry in journal entries
+        $openingEntryExists = JournalEntry::where('business_id', $businessId)
+            ->where('ledger_account_id', $ledgerAccountId)
+            ->where('narration', 'LIKE', '%Opening Balance%')
+            ->exists();
+
+        // If no opening balance entry in journal entries, add from ledger account opening balance
+        if (!$openingEntryExists && $ledgerAccount->opening_balance > 0) {
+            if ($ledgerAccount->opening_balance_type === 'debit') {
+                $totalDebit += $ledgerAccount->opening_balance;
+            } else {
+                $totalCredit += $ledgerAccount->opening_balance;
+            }
+        }
+
+        // Calculate balance based on account nature
+        $accountNature = $ledgerAccount->accountGroup->nature;
+
+        if ($accountNature === 'assets' || $accountNature === 'expense') {
+            // For Assets and Expenses: Debit increases balance
+            return $totalDebit - $totalCredit;
+        } else {
+            // For Liabilities, Equity, and Income: Credit increases balance
+            return $totalCredit - $totalDebit;
+        }
+    }
+
+    private function getAllChildGroupIds($businessId, $parentGroupId)
+    {
+        $childIds = [];
+
+        $children = AccountGroup::where('business_id', $businessId)
+            ->where('parent_id', $parentGroupId)
+            ->get();
+
+        foreach ($children as $child) {
+            $childIds[] = $child->id;
+            $childIds = array_merge($childIds, $this->getAllChildGroupIds($businessId, $child->id));
+        }
+
+        return $childIds;
+    }
+
+    private function calculateTotals($businessId, $nature, $asOfDate, $financialYearId)
+    {
+        // Get all account groups of the specified nature
+        $accountGroupIds = AccountGroup::where('business_id', $businessId)
+            ->where('nature', $nature)
+            ->pluck('id')
+            ->toArray();
+
+        // Get all ledger accounts under these groups
+        $ledgerAccountIds = LedgerAccount::whereIn('account_group_id', $accountGroupIds)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->toArray();
+
+        if (empty($ledgerAccountIds)) {
+            return [
+                'total_debit' => 0,
+                'total_credit' => 0,
+                'total' => 0
+            ];
+        }
+
+        // Calculate totals from journal entries
+        $query = JournalEntry::where('business_id', $businessId)
+            ->whereIn('ledger_account_id', $ledgerAccountIds)
+            ->where('date', '<=', $asOfDate);
+
+        if ($financialYearId) {
+            $query->where('financial_year_id', $financialYearId);
+        }
+
+        $result = $query->selectRaw('
+        SUM(debit_amount) as total_debit,
+        SUM(credit_amount) as total_credit
+    ')->first();
+
+        $totalDebit = $result->total_debit ?? 0;
+        $totalCredit = $result->total_credit ?? 0;
+
+        // Add opening balances only if no opening balance entries exist in journal entries
+        $ledgerAccountsWithOpening = LedgerAccount::whereIn('account_group_id', $accountGroupIds)
+            ->where('is_active', true)
+            ->where('opening_balance', '>', 0)
+            ->get();
+
+        foreach ($ledgerAccountsWithOpening as $account) {
+            // Check if opening balance entry exists for this account
+            $openingEntryExists = JournalEntry::where('business_id', $businessId)
+                ->where('ledger_account_id', $account->id)
+                ->where('narration', 'LIKE', '%Opening Balance%')
+                ->exists();
+
+            // Only add opening balance if no opening entry exists in journal entries
+            if (!$openingEntryExists) {
+                if ($account->opening_balance_type === 'debit') {
+                    $totalDebit += $account->opening_balance;
+                } else {
+                    $totalCredit += $account->opening_balance;
+                }
+            }
+        }
+
+        // Calculate net total based on account nature
+        if ($nature === 'assets' || $nature === 'expense') {
+            $total = $totalDebit - $totalCredit;
+        } else {
+            $total = $totalCredit - $totalDebit;
+        }
+
+        return [
+            'total_debit' => $totalDebit,
+            'total_credit' => $totalCredit,
+            'total' => $total
+        ];
+    }
     /**
      * Display the profit and loss report.
      */
@@ -358,30 +685,52 @@ class ReportController extends Controller
             } else if ($comparativePeriod == 'previous_month') {
                 $comparativeFromDate = Carbon::parse($fromDate)->subMonth()->format('Y-m-d');
                 $comparativeToDate = Carbon::parse($toDate)->subMonth()->format('Y-m-d');
+                $comparativeFinancialYear = $financialYear;
             } else if ($comparativePeriod == 'previous_quarter') {
                 $comparativeFromDate = Carbon::parse($fromDate)->subMonths(3)->format('Y-m-d');
                 $comparativeToDate = Carbon::parse($toDate)->subMonths(3)->format('Y-m-d');
+                $comparativeFinancialYear = $financialYear;
             }
         }
 
-        // Get account groups for income and expense
-        $incomeGroups = AccountGroup::with('children.children.children')
+        // Get account groups for income and expense with proper relationships
+        $incomeGroups = AccountGroup::with([
+            'children' => function ($query) {
+                $query->with([
+                    'children' => function ($subQuery) {
+                        $subQuery->with('children')->orderBy('sequence');
+                    }
+                ])->orderBy('sequence');
+            }
+        ])
             ->where('business_id', $businessId)
             ->where('nature', 'income')
             ->whereNull('parent_id')
             ->orderBy('sequence')
             ->get();
 
-        $expenseGroups = AccountGroup::with('children.children.children')
+        $expenseGroups = AccountGroup::with([
+            'children' => function ($query) {
+                $query->with([
+                    'children' => function ($subQuery) {
+                        $subQuery->with('children')->orderBy('sequence');
+                    }
+                ])->orderBy('sequence');
+            }
+        ])
             ->where('business_id', $businessId)
             ->where('nature', 'expense')
             ->whereNull('parent_id')
             ->orderBy('sequence')
             ->get();
 
+        // Calculate individual balances for income and expense groups
+        $incomeGroups = $this->calculatePLAccountGroupBalances($businessId, $fromDate, $toDate, $financialYearId, $incomeGroups, $showZeroBalances);
+        $expenseGroups = $this->calculatePLAccountGroupBalances($businessId, $fromDate, $toDate, $financialYearId, $expenseGroups, $showZeroBalances);
+
         // Calculate totals for income and expense
-        $incomeTotals = $this->calculateTotals($businessId, 'income', $toDate, $financialYearId, $fromDate);
-        $expenseTotals = $this->calculateTotals($businessId, 'expense', $toDate, $financialYearId, $fromDate);
+        $incomeTotals = $this->calculatePLTotals($businessId, 'income', $fromDate, $toDate, $financialYearId);
+        $expenseTotals = $this->calculatePLTotals($businessId, 'expense', $fromDate, $toDate, $financialYearId);
 
         // Calculate gross profit if needed
         $grossProfit = 0;
@@ -390,16 +739,17 @@ class ReportController extends Controller
 
         if ($showGrossProfit) {
             // Get direct income and expense (affects gross profit)
-            $directIncome = $this->calculateTotals($businessId, 'income', $toDate, $financialYearId, $fromDate, true)['total'];
-            $directExpense = $this->calculateTotals($businessId, 'expense', $toDate, $financialYearId, $fromDate, true)['total'];
-
+            $directIncome = $this->calculatePLTotals($businessId, 'income', $fromDate, $toDate, $financialYearId, true)['total'];
+            $directExpense = $this->calculatePLTotals($businessId, 'expense', $fromDate, $toDate, $financialYearId, true)['total'];
             $grossProfit = $directIncome - $directExpense;
         }
 
         // Calculate net profit
         $netProfit = $incomeTotals['total'] - $expenseTotals['total'];
 
-        // Calculate comparative totals if needed
+        // Initialize comparative variables
+        $comparativeIncomeGroups = null;
+        $comparativeExpenseGroups = null;
         $comparativeIncomeTotals = null;
         $comparativeExpenseTotals = null;
         $comparativeGrossProfit = null;
@@ -407,14 +757,50 @@ class ReportController extends Controller
         $comparativeDirectIncome = null;
         $comparativeDirectExpense = null;
 
-        if ($showComparative && $comparativeFromDate && $comparativeToDate) {
-            $comparativeIncomeTotals = $this->calculateTotals($businessId, 'income', $comparativeToDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null, $comparativeFromDate);
-            $comparativeExpenseTotals = $this->calculateTotals($businessId, 'expense', $comparativeToDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null, $comparativeFromDate);
+        // Calculate comparative data if needed
+        if ($showComparative && $comparativeFromDate && $comparativeToDate && $comparativeFinancialYear) {
+            // Get comparative income and expense groups
+            $comparativeIncomeGroups = AccountGroup::with([
+                'children' => function ($query) {
+                    $query->with([
+                        'children' => function ($subQuery) {
+                            $subQuery->with('children')->orderBy('sequence');
+                        }
+                    ])->orderBy('sequence');
+                }
+            ])
+                ->where('business_id', $businessId)
+                ->where('nature', 'income')
+                ->whereNull('parent_id')
+                ->orderBy('sequence')
+                ->get();
+
+            $comparativeExpenseGroups = AccountGroup::with([
+                'children' => function ($query) {
+                    $query->with([
+                        'children' => function ($subQuery) {
+                            $subQuery->with('children')->orderBy('sequence');
+                        }
+                    ])->orderBy('sequence');
+                }
+            ])
+                ->where('business_id', $businessId)
+                ->where('nature', 'expense')
+                ->whereNull('parent_id')
+                ->orderBy('sequence')
+                ->get();
+
+            // Calculate comparative balances
+            $comparativeIncomeGroups = $this->calculatePLAccountGroupBalances($businessId, $comparativeFromDate, $comparativeToDate, $comparativeFinancialYear->id, $comparativeIncomeGroups, $showZeroBalances);
+            $comparativeExpenseGroups = $this->calculatePLAccountGroupBalances($businessId, $comparativeFromDate, $comparativeToDate, $comparativeFinancialYear->id, $comparativeExpenseGroups, $showZeroBalances);
+
+            // Calculate comparative totals
+            $comparativeIncomeTotals = $this->calculatePLTotals($businessId, 'income', $comparativeFromDate, $comparativeToDate, $comparativeFinancialYear->id);
+            $comparativeExpenseTotals = $this->calculatePLTotals($businessId, 'expense', $comparativeFromDate, $comparativeToDate, $comparativeFinancialYear->id);
 
             if ($showGrossProfit) {
-                $comparativeDirectIncome = $this->calculateTotals($businessId, 'income', $comparativeToDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null, $comparativeFromDate, true)['total'];
-                $comparativeDirectExpense = $this->calculateTotals($businessId, 'expense', $comparativeToDate, $comparativeFinancialYear ? $comparativeFinancialYear->id : null, $comparativeFromDate, true)['total'];
-
+                $comparativeDirectIncome = $this->calculatePLTotals($businessId, 'income', $comparativeFromDate, $comparativeToDate, $comparativeFinancialYear->id, true)['total'];
+                $comparativeDirectExpense = $this->calculatePLTotals($businessId, 'expense', $comparativeFromDate, $comparativeToDate, $comparativeFinancialYear->id, true)['total'];
                 $comparativeGrossProfit = $comparativeDirectIncome - $comparativeDirectExpense;
             }
 
@@ -437,6 +823,8 @@ class ReportController extends Controller
             'net_profit' => $netProfit,
             'direct_income' => $directIncome,
             'direct_expense' => $directExpense,
+            'comparative_income_groups' => $comparativeIncomeGroups,
+            'comparative_expense_groups' => $comparativeExpenseGroups,
             'comparative_income_totals' => $comparativeIncomeTotals,
             'comparative_expense_totals' => $comparativeExpenseTotals,
             'comparative_gross_profit' => $comparativeGrossProfit,
@@ -459,6 +847,148 @@ class ReportController extends Controller
                 'previous_month' => 'Previous Month',
             ],
         ]);
+    }
+
+    // Profit & Loss specific calculation methods
+    private function calculatePLAccountGroupBalances($businessId, $fromDate, $toDate, $financialYearId, $groups, $showZeroBalances = false)
+    {
+        foreach ($groups as $group) {
+            // Get direct ledger accounts for this group only
+            $group->ledger_accounts = $this->getPLLedgerAccountsWithBalances($businessId, $group->id, $fromDate, $toDate, $financialYearId, $showZeroBalances);
+
+            // Calculate balance for direct ledger accounts only
+            $directBalance = $group->ledger_accounts->sum('balance');
+
+            // Calculate balances for children recursively
+            $childrenBalance = 0;
+            if ($group->children && $group->children->count() > 0) {
+                $group->children = $this->calculatePLAccountGroupBalances($businessId, $fromDate, $toDate, $financialYearId, $group->children, $showZeroBalances);
+                $childrenBalance = $group->children->sum('balance');
+            }
+
+            // Total balance = direct accounts + children groups
+            $group->balance = $directBalance + $childrenBalance;
+        }
+
+        return $groups;
+    }
+
+    private function getPLLedgerAccountsWithBalances($businessId, $accountGroupId, $fromDate, $toDate, $financialYearId, $showZeroBalances = false)
+    {
+        $ledgerAccounts = LedgerAccount::where('business_id', $businessId)
+            ->where('account_group_id', $accountGroupId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        foreach ($ledgerAccounts as $account) {
+            $account->balance = $this->getPLLedgerAccountBalance($businessId, $account->id, $fromDate, $toDate, $financialYearId);
+        }
+
+        // Filter zero balances if not showing them
+        if (!$showZeroBalances) {
+            $ledgerAccounts = $ledgerAccounts->filter(function ($account) {
+                return abs($account->balance) > 0.01;
+            });
+        }
+
+        return $ledgerAccounts->values();
+    }
+
+    private function getPLLedgerAccountBalance($businessId, $ledgerAccountId, $fromDate, $toDate, $financialYearId)
+    {
+        // Get the ledger account to check its nature
+        $ledgerAccount = LedgerAccount::with('accountGroup')->find($ledgerAccountId);
+        if (!$ledgerAccount) {
+            return 0;
+        }
+
+        // Calculate from journal entries within date range
+        $query = JournalEntry::where('business_id', $businessId)
+            ->where('ledger_account_id', $ledgerAccountId)
+            ->whereBetween('date', [$fromDate, $toDate]);
+
+        if ($financialYearId) {
+            $query->where('financial_year_id', $financialYearId);
+        }
+
+        $result = $query->selectRaw('
+        SUM(debit_amount) as total_debit,
+        SUM(credit_amount) as total_credit
+    ')->first();
+
+        $totalDebit = $result->total_debit ?? 0;
+        $totalCredit = $result->total_credit ?? 0;
+
+        // For P&L accounts, we don't add opening balance as it's period-specific
+        // Calculate balance based on account nature
+        $accountNature = $ledgerAccount->accountGroup->nature;
+
+        if ($accountNature === 'income') {
+            // For Income: Credit increases balance (revenue)
+            return $totalCredit - $totalDebit;
+        } else {
+            // For Expense: Debit increases balance (costs)
+            return $totalDebit - $totalCredit;
+        }
+    }
+
+    private function calculatePLTotals($businessId, $nature, $fromDate, $toDate, $financialYearId, $grossProfitOnly = false)
+    {
+        // Get account groups of the specified nature
+        $query = AccountGroup::where('business_id', $businessId)
+            ->where('nature', $nature);
+
+        // If calculating gross profit only, filter by affects_gross_profit
+        if ($grossProfitOnly) {
+            $query->where('affects_gross_profit', true);
+        }
+
+        $accountGroupIds = $query->pluck('id')->toArray();
+
+        // Get all ledger accounts under these groups
+        $ledgerAccountIds = LedgerAccount::whereIn('account_group_id', $accountGroupIds)
+            ->where('is_active', true)
+            ->pluck('id')
+            ->toArray();
+
+        if (empty($ledgerAccountIds)) {
+            return [
+                'total_debit' => 0,
+                'total_credit' => 0,
+                'total' => 0
+            ];
+        }
+
+        // Calculate totals from journal entries within date range
+        $query = JournalEntry::where('business_id', $businessId)
+            ->whereIn('ledger_account_id', $ledgerAccountIds)
+            ->whereBetween('date', [$fromDate, $toDate]);
+
+        if ($financialYearId) {
+            $query->where('financial_year_id', $financialYearId);
+        }
+
+        $result = $query->selectRaw('
+        SUM(debit_amount) as total_debit,
+        SUM(credit_amount) as total_credit
+    ')->first();
+
+        $totalDebit = $result->total_debit ?? 0;
+        $totalCredit = $result->total_credit ?? 0;
+
+        // Calculate net total based on account nature
+        if ($nature === 'income') {
+            $total = $totalCredit - $totalDebit;
+        } else {
+            $total = $totalDebit - $totalCredit;
+        }
+
+        return [
+            'total_debit' => $totalDebit,
+            'total_credit' => $totalCredit,
+            'total' => $total
+        ];
     }
 
     /**
@@ -1011,6 +1541,7 @@ class ReportController extends Controller
     /**
      * Display the party statement report.
      */
+
     public function partyStatement(Request $request)
     {
         $businessId = session('current_business_id');
@@ -1034,7 +1565,7 @@ class ReportController extends Controller
             ]);
         }
 
-        $party = Party::with('ledgerAccount')
+        $party = Party::with(['ledgerAccount.accountGroup'])
             ->findOrFail($partyId);
 
         if ($party->business_id != $businessId) {
@@ -1082,7 +1613,7 @@ class ReportController extends Controller
             }
 
             // Calculate balance based on account nature
-            $accountNature = $party->ledgerAccount->accountGroup->nature;
+            $accountNature = $party->ledgerAccount->accountGroup->nature ?? 'assets';
 
             if (in_array($accountNature, ['assets', 'expense'])) {
                 $openingBalance = $totalDebit - $totalCredit;
@@ -1095,8 +1626,8 @@ class ReportController extends Controller
             }
         } else {
             // Just use the account's opening balance
-            $openingBalance = $party->ledgerAccount->opening_balance;
-            $openingBalanceType = $party->ledgerAccount->opening_balance_type;
+            $openingBalance = $party->ledgerAccount->opening_balance ?? 0;
+            $openingBalanceType = $party->ledgerAccount->opening_balance_type ?? 'debit';
         }
 
         // Calculate running balance if needed
@@ -1134,6 +1665,7 @@ class ReportController extends Controller
             ->orderBy('name')
             ->get();
 
+        // ✅ FIXED: Correct file name here
         return Inertia::render('report/party-statement', [
             'party' => $party,
             'journal_entries' => $journalEntries,
@@ -1141,7 +1673,7 @@ class ReportController extends Controller
             'opening_balance_type' => $openingBalanceType,
             'parties' => $parties,
             'filters' => [
-                'party_id' => $partyId,
+                'party_id' => (int) $partyId,
                 'from_date' => $fromDate,
                 'to_date' => $toDate,
                 'show_running_balance' => $showRunningBalance,
@@ -1321,51 +1853,4 @@ class ReportController extends Controller
         ]);
     }
 
-    /**
-     * Calculate totals for a specific nature.
-     */
-    private function calculateTotals($businessId, $nature, $toDate, $financialYearId = null, $fromDate = null, $affectsGrossProfit = false)
-    {
-        $query = JournalEntry::where('business_id', $businessId)
-            ->whereHas('ledgerAccount.accountGroup', function ($query) use ($nature, $affectsGrossProfit) {
-                $query->where('nature', $nature);
-
-                if ($affectsGrossProfit) {
-                    $query->where('affects_gross_profit', true);
-                }
-            });
-
-        if ($financialYearId) {
-            $query->where('financial_year_id', $financialYearId);
-        }
-
-        if ($toDate) {
-            $query->where('date', '<=', $toDate);
-        }
-
-        if ($fromDate) {
-            $query->where('date', '>=', $fromDate);
-        }
-
-        $result = $query->selectRaw('SUM(debit_amount) as total_debit, SUM(credit_amount) as total_credit')
-            ->first();
-
-        $totalDebit = $result->total_debit ?? 0;
-        $totalCredit = $result->total_credit ?? 0;
-
-        // Calculate total based on nature
-        $total = 0;
-
-        if (in_array($nature, ['assets', 'expense'])) {
-            $total = $totalDebit - $totalCredit;
-        } else {
-            $total = $totalCredit - $totalDebit;
-        }
-
-        return [
-            'total_debit' => $totalDebit,
-            'total_credit' => $totalCredit,
-            'total' => $total,
-        ];
-    }
 }

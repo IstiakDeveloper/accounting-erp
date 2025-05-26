@@ -17,7 +17,7 @@ import {
 interface LedgerAccount {
   id: number;
   name: string;
-  account_code: string;
+  code: string;
   accountGroup: {
     id: number;
     name: string;
@@ -396,7 +396,7 @@ export default function VoucherCreate({
                         <optgroup key={groupName} label={groupName}>
                           {grouped_accounts[groupName].map((account) => (
                             <option key={account.id} value={account.id}>
-                              {account.name} ({account.account_code})
+                              {account.name} ({account.code})
                             </option>
                           ))}
                         </optgroup>

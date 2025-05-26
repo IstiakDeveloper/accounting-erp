@@ -129,4 +129,6 @@ class UserBusiness extends Model
             'manage_recurring_transactions' => 'Manage Recurring Transactions',
         ];
     }
+
+
 }

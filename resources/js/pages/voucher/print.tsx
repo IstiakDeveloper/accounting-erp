@@ -147,7 +147,7 @@ export default function VoucherPrint({ voucher }: Props) {
     }
 
     // Extract rupees and paise
-    const rupees = Math.floor(amount);
+    let rupees = Math.floor(amount);  // Changed from const to let
     const paise = Math.round((amount - rupees) * 100);
 
     let result = '';

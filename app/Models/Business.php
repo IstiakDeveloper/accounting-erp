@@ -46,11 +46,6 @@ class Business extends Model
         return $this->hasMany(Party::class);
     }
 
-    public function financialYears()
-    {
-        return $this->hasMany(FinancialYear::class);
-    }
-
     public function voucherTypes()
     {
         return $this->hasMany(VoucherType::class);
@@ -81,12 +76,6 @@ class Business extends Model
         return $this->hasMany(SystemSetting::class);
     }
 
-    public function users()
-    {
-        return $this->belongsToMany(User::class, 'users_businesses')
-            ->withPivot(['is_owner', 'is_admin', 'permissions'])
-            ->withTimestamps();
-    }
 
     public function costCenters()
     {
@@ -139,9 +128,96 @@ class Business extends Model
         return $query->where('is_active', true);
     }
 
-    // Getting current financial year
+
+
+
+
+
+
+
     public function getCurrentFinancialYear()
     {
-        return $this->financialYears()->where('is_current', true)->first();
+        return $this->financialYears()
+            ->where('is_current', true)
+            ->first();
+    }
+
+    /**
+     * Get all financial years for this business
+     */
+    public function financialYears()
+    {
+        return $this->hasMany(FinancialYear::class);
+    }
+
+    /**
+     * Get active financial years
+     */
+    public function activeFinancialYears()
+    {
+        return $this->financialYears()
+            ->where('is_locked', false)
+            ->orderBy('start_date', 'desc');
+    }
+
+    /**
+     * Check if business has a current financial year
+     */
+    public function hasCurrentFinancialYear()
+    {
+        return $this->financialYears()
+            ->where('is_current', true)
+            ->exists();
+    }
+
+    /**
+     * Get business users with their roles
+     */
+    public function users()
+    {
+        return $this->belongsToMany(User::class, 'users_businesses')
+            ->withPivot(['is_owner', 'is_admin', 'permissions'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Get business owners
+     */
+    public function owners()
+    {
+        return $this->users()->wherePivot('is_owner', true);
+    }
+
+    /**
+     * Get business admins (including owners)
+     */
+    public function admins()
+    {
+        return $this->users()->where(function ($query) {
+            $query->wherePivot('is_owner', true)
+                ->orWherePivot('is_admin', true);
+        });
+    }
+
+    /**
+     * Check if business is accessible
+     */
+    public function isAccessible()
+    {
+        return $this->is_active && $this->hasCurrentFinancialYear();
+    }
+
+    /**
+     * Get business statistics
+     */
+    public function getStats()
+    {
+        return [
+            'total_users' => $this->users()->count(),
+            'owners_count' => $this->owners()->count(),
+            'admins_count' => $this->admins()->count(),
+            'has_financial_year' => $this->hasCurrentFinancialYear(),
+            'is_active' => $this->is_active,
+        ];
     }
 }

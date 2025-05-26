@@ -8,12 +8,7 @@ import {
     Printer,
     ChevronDown,
     ChevronRight,
-    Calculator,
-    ArrowRight,
     XCircle,
-    BarChart2,
-    Clock,
-    Layers
 } from 'lucide-react';
 
 interface FinancialYear {
@@ -25,13 +20,22 @@ interface FinancialYear {
     is_current: boolean;
 }
 
+interface LedgerAccount {
+    id: number;
+    name: string;
+    code: string | null;
+    balance: number;
+}
+
 interface AccountGroup {
     id: number;
     name: string;
     code: string | null;
     nature: string;
     parent_id: number | null;
+    balance: number;
     children: AccountGroup[];
+    ledger_accounts: LedgerAccount[];
 }
 
 interface Totals {
@@ -53,6 +57,9 @@ interface Props {
     comparative_asset_totals: Totals | null;
     comparative_liability_totals: Totals | null;
     comparative_equity_totals: Totals | null;
+    comparative_asset_groups: AccountGroup[] | null;
+    comparative_liability_groups: AccountGroup[] | null;
+    comparative_equity_groups: AccountGroup[] | null;
     comparative_net_profit: number | null;
     comparative_financial_year: FinancialYear | null;
     filters: {
@@ -80,6 +87,9 @@ export default function BalanceSheet({
     comparative_asset_totals,
     comparative_liability_totals,
     comparative_equity_totals,
+    comparative_asset_groups,
+    comparative_liability_groups,
+    comparative_equity_groups,
     comparative_net_profit,
     comparative_financial_year,
     filters,
@@ -110,7 +120,7 @@ export default function BalanceSheet({
         const formattedNumber = new Intl.NumberFormat('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-        }).format(amount);
+        }).format(Math.abs(amount));
 
         return `৳${formattedNumber}`;
     };
@@ -143,111 +153,48 @@ export default function BalanceSheet({
         });
     };
 
-    // Generate CSV export
-    const exportCSV = () => {
-        let csvContent = "data:text/csv;charset=utf-8,";
+    // Find comparative group by ID
+    const findComparativeGroup = (groups: AccountGroup[] | null, groupId: number): AccountGroup | undefined => {
+        if (!groups) return undefined;
 
-        // Headers
-        if (data.show_comparative) {
-            csvContent += `Account,As of ${formatDate(data.as_of_date)},${comparative_period_options[data.comparative_period]},Change\n`;
-        } else {
-            csvContent += `Account,Amount\n`;
+        for (const group of groups) {
+            if (group.id === groupId) return group;
+            if (group.children && group.children.length > 0) {
+                const found = findComparativeGroup(group.children, groupId);
+                if (found) return found;
+            }
         }
-
-        // Assets
-        csvContent += `ASSETS,,\n`;
-        asset_groups.forEach(group => {
-            // Add group
-            csvContent += `${group.name},${asset_totals.total},`;
-            if (data.show_comparative && comparative_asset_totals) {
-                csvContent += `${comparative_asset_totals.total},${asset_totals.total - comparative_asset_totals.total}\n`;
-            } else {
-                csvContent += '\n';
-            }
-
-            // Add children if any
-            if (group.children && group.children.length > 0) {
-                group.children.forEach(child => {
-                    csvContent += `  ${child.name},,\n`;
-                    // Add grand-children if any
-                    if (child.children && child.children.length > 0) {
-                        child.children.forEach(grandChild => {
-                            csvContent += `    ${grandChild.name},,\n`;
-                        });
-                    }
-                });
-            }
-        });
-
-        // Add liabilities and equity
-        csvContent += `LIABILITIES,,\n`;
-        liability_groups.forEach(group => {
-            csvContent += `${group.name},${liability_totals.total},`;
-            if (data.show_comparative && comparative_liability_totals) {
-                csvContent += `${comparative_liability_totals.total},${liability_totals.total - comparative_liability_totals.total}\n`;
-            } else {
-                csvContent += '\n';
-            }
-
-            // Add children
-            if (group.children && group.children.length > 0) {
-                group.children.forEach(child => {
-                    csvContent += `  ${child.name},,\n`;
-                });
-            }
-        });
-
-        csvContent += `EQUITY,,\n`;
-        equity_groups.forEach(group => {
-            csvContent += `${group.name},${equity_totals.total},`;
-            if (data.show_comparative && comparative_equity_totals) {
-                csvContent += `${comparative_equity_totals.total},${equity_totals.total - comparative_equity_totals.total}\n`;
-            } else {
-                csvContent += '\n';
-            }
-
-            // Add children
-            if (group.children && group.children.length > 0) {
-                group.children.forEach(child => {
-                    csvContent += `  ${child.name},,\n`;
-                });
-            }
-        });
-
-        // Add net profit
-        csvContent += `Net Profit,${net_profit},`;
-        if (data.show_comparative && comparative_net_profit !== null) {
-            csvContent += `${comparative_net_profit},${net_profit - comparative_net_profit}\n`;
-        } else {
-            csvContent += '\n';
-        }
-
-        // Create download link
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `balance_sheet_${data.as_of_date}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        return undefined;
     };
 
     // Recursive function to render account groups
-    const renderAccountGroup = (group: AccountGroup, depth = 0) => {
+    const renderAccountGroup = (group: AccountGroup, depth = 0, comparativeGroups: AccountGroup[] | null = null) => {
         const isExpanded = expandedGroups[group.id] || false;
         const hasChildren = group.children && group.children.length > 0;
+        const hasLedgerAccounts = group.ledger_accounts && group.ledger_accounts.length > 0;
+
+        // Find comparative group
+        const comparativeGroup = findComparativeGroup(comparativeGroups, group.id);
+
+        // Calculate change if comparative data exists
+        const change = comparativeGroup ? group.balance - comparativeGroup.balance : 0;
+
+        // Determine if this group should show its balance or just act as a container
+        const showGroupBalance = !hasChildren && !hasLedgerAccounts; // Only show balance if it's a leaf group with no sub-items
 
         return (
             <React.Fragment key={group.id}>
+                {/* Group Header Row */}
                 <tr
                     className={`hover:bg-gray-50 ${depth === 0 ? 'font-semibold' : ''} ${depth > 0 ? 'text-sm' : ''}`}
                 >
                     <td
-                        className={`px-6 py-2 ${depth > 0 ? `pl-${6 + (depth * 4)}` : ''}`}
-                        onClick={() => hasChildren && toggleGroup(group.id)}
+                        className={`px-6 py-2`}
+                        style={{ paddingLeft: depth > 0 ? `${1.5 + (depth * 1)}rem` : '1.5rem' }}
                     >
-                        <div className="flex items-center">
-                            {hasChildren && (
+                        <div className="flex items-center cursor-pointer"
+                            onClick={() => (hasChildren || hasLedgerAccounts) && toggleGroup(group.id)}>
+                            {(hasChildren || hasLedgerAccounts) && (
                                 <button
                                     type="button"
                                     onClick={(e) => {
@@ -269,24 +216,191 @@ export default function BalanceSheet({
                         </div>
                     </td>
                     <td className="px-6 py-2 text-right">
-                        {formatCurrency(0)} {/* This would be dynamic in a real implementation */}
+                        {/* শুধু leaf groups বা যাদের কোন children/ledger accounts নেই তাদের balance দেখাবো */}
+                        {showGroupBalance ? formatCurrency(group.balance) : ''}
                     </td>
                     {data.show_comparative && (
                         <>
                             <td className="px-6 py-2 text-right">
-                                {formatCurrency(0)} {/* This would be dynamic in a real implementation */}
+                                {showGroupBalance && comparativeGroup ? formatCurrency(comparativeGroup.balance) : ''}
                             </td>
                             <td className="px-6 py-2 text-right">
-                                {formatCurrency(0)} {/* This would be dynamic in a real implementation */}
+                                {showGroupBalance && (
+                                    <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
+                                        {formatCurrency(change)}
+                                        {change !== 0 && (
+                                            <span className="ml-1 text-xs">
+                                                {change > 0 ? '↑' : '↓'}
+                                            </span>
+                                        )}
+                                    </span>
+                                )}
                             </td>
                         </>
                     )}
                 </tr>
 
                 {/* Render children if expanded */}
-                {isExpanded && hasChildren && group.children.map(child => renderAccountGroup(child, depth + 1))}
+                {isExpanded && hasChildren && group.children.map(child =>
+                    renderAccountGroup(child, depth + 1, comparativeGroup?.children)
+                )}
+
+                {/* Render ledger accounts if expanded */}
+                {isExpanded && hasLedgerAccounts && group.ledger_accounts.map(account => {
+                    const comparativeLedgerAccount = comparativeGroup?.ledger_accounts?.find(ca => ca.id === account.id);
+                    const accountChange = comparativeLedgerAccount ? account.balance - comparativeLedgerAccount.balance : 0;
+
+                    return (
+                        <tr key={`ledger-${account.id}`} className="text-sm text-gray-600">
+                            <td className="px-6 py-1" style={{ paddingLeft: `${2 + (depth * 1)}rem` }}>
+                                <div className="flex items-center">
+                                    <span className="mr-2 text-gray-400">├─</span>
+                                    <span>{account.name}</span>
+                                    {account.code && (
+                                        <span className="ml-2 text-gray-400 text-xs">({account.code})</span>
+                                    )}
+                                </div>
+                            </td>
+                            <td className="px-6 py-1 text-right">
+                                {formatCurrency(account.balance)}
+                            </td>
+                            {data.show_comparative && (
+                                <>
+                                    <td className="px-6 py-1 text-right">
+                                        {comparativeLedgerAccount ? formatCurrency(comparativeLedgerAccount.balance) : formatCurrency(0)}
+                                    </td>
+                                    <td className="px-6 py-1 text-right">
+                                        <span className={accountChange > 0 ? 'text-green-600' : accountChange < 0 ? 'text-red-600' : ''}>
+                                            {formatCurrency(accountChange)}
+                                            {accountChange !== 0 && (
+                                                <span className="ml-1 text-xs">
+                                                    {accountChange > 0 ? '↑' : '↓'}
+                                                </span>
+                                            )}
+                                        </span>
+                                    </td>
+                                </>
+                            )}
+                        </tr>
+                    );
+                })}
+
+                {/* Show subtotal for groups that have children or ledger accounts */}
+                {isExpanded && (hasChildren || hasLedgerAccounts) && (
+                    <tr className="bg-gray-50 text-sm font-medium">
+                        <td className="px-6 py-2" style={{ paddingLeft: `${1.5 + (depth * 1)}rem` }}>
+                            <span className="text-gray-600">Total {group.name}</span>
+                        </td>
+                        <td className="px-6 py-2 text-right">
+                            {formatCurrency(group.balance)}
+                        </td>
+                        {data.show_comparative && (
+                            <>
+                                <td className="px-6 py-2 text-right">
+                                    {comparativeGroup ? formatCurrency(comparativeGroup.balance) : formatCurrency(0)}
+                                </td>
+                                <td className="px-6 py-2 text-right">
+                                    <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
+                                        {formatCurrency(change)}
+                                        {change !== 0 && (
+                                            <span className="ml-1 text-xs">
+                                                {change > 0 ? '↑' : '↓'}
+                                            </span>
+                                        )}
+                                    </span>
+                                </td>
+                            </>
+                        )}
+                    </tr>
+                )}
             </React.Fragment>
         );
+    };
+
+    // Generate CSV export
+    const exportCSV = () => {
+        let csvContent = "data:text/csv;charset=utf-8,";
+
+        // Headers
+        if (data.show_comparative) {
+            csvContent += `Account,As of ${formatDate(data.as_of_date)},${comparative_period_options[data.comparative_period]},Change\n`;
+        } else {
+            csvContent += `Account,Amount\n`;
+        }
+
+        // Helper function to add group data to CSV
+        const addGroupToCSV = (groups: AccountGroup[], comparativeGroups: AccountGroup[] | null = null, prefix = '') => {
+            groups.forEach(group => {
+                const comparativeGroup = findComparativeGroup(comparativeGroups, group.id);
+                const change = comparativeGroup ? group.balance - comparativeGroup.balance : 0;
+
+                csvContent += `${prefix}${group.name},${group.balance}`;
+                if (data.show_comparative) {
+                    csvContent += `,${comparativeGroup ? comparativeGroup.balance : 0},${change}`;
+                }
+                csvContent += '\n';
+
+                // Add ledger accounts
+                if (group.ledger_accounts && group.ledger_accounts.length > 0) {
+                    group.ledger_accounts.forEach(account => {
+                        const comparativeAccount = comparativeGroup?.ledger_accounts?.find(ca => ca.id === account.id);
+                        const accountChange = comparativeAccount ? account.balance - comparativeAccount.balance : 0;
+
+                        csvContent += `${prefix}  ${account.name},${account.balance}`;
+                        if (data.show_comparative) {
+                            csvContent += `,${comparativeAccount ? comparativeAccount.balance : 0},${accountChange}`;
+                        }
+                        csvContent += '\n';
+                    });
+                }
+
+                // Add children recursively
+                if (group.children && group.children.length > 0) {
+                    addGroupToCSV(group.children, comparativeGroup?.children, prefix + '  ');
+                }
+            });
+        };
+
+        // Assets
+        csvContent += `ASSETS,,\n`;
+        addGroupToCSV(asset_groups, comparative_asset_groups);
+        csvContent += `Total Assets,${asset_totals.total}`;
+        if (data.show_comparative && comparative_asset_totals) {
+            csvContent += `,${comparative_asset_totals.total},${asset_totals.total - comparative_asset_totals.total}`;
+        }
+        csvContent += '\n\n';
+
+        // Liabilities
+        csvContent += `LIABILITIES,,\n`;
+        addGroupToCSV(liability_groups, comparative_liability_groups);
+        csvContent += `Total Liabilities,${liability_totals.total}`;
+        if (data.show_comparative && comparative_liability_totals) {
+            csvContent += `,${comparative_liability_totals.total},${liability_totals.total - comparative_liability_totals.total}`;
+        }
+        csvContent += '\n\n';
+
+        // Equity
+        csvContent += `EQUITY,,\n`;
+        addGroupToCSV(equity_groups, comparative_equity_groups);
+        csvContent += `Net Profit,${net_profit}`;
+        if (data.show_comparative && comparative_net_profit !== null) {
+            csvContent += `,${comparative_net_profit},${net_profit - comparative_net_profit}`;
+        }
+        csvContent += '\n';
+        csvContent += `Total Equity,${equity_totals.total}`;
+        if (data.show_comparative && comparative_equity_totals) {
+            csvContent += `,${comparative_equity_totals.total},${equity_totals.total - comparative_equity_totals.total}`;
+        }
+        csvContent += '\n';
+
+        // Create download link
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `balance_sheet_${data.as_of_date}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -422,10 +536,11 @@ export default function BalanceSheet({
                         <button
                             type="button"
                             onClick={applyFilters}
-                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            disabled={processing}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                         >
                             <Filter className="h-4 w-4 mr-2" />
-                            Apply Filters
+                            {processing ? 'Loading...' : 'Apply Filters'}
                         </button>
                     </div>
                 </div>
@@ -491,7 +606,7 @@ export default function BalanceSheet({
                                 </td>
                             </tr>
 
-                            {asset_groups.map(group => renderAccountGroup(group))}
+                            {asset_groups.map(group => renderAccountGroup(group, 0, comparative_asset_groups))}
 
                             {/* Asset Totals */}
                             <tr className="bg-gray-50 font-semibold">
@@ -501,7 +616,14 @@ export default function BalanceSheet({
                                     <>
                                         <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_asset_totals.total)}</td>
                                         <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(asset_totals.total - comparative_asset_totals.total)}
+                                            <span className={(asset_totals.total - comparative_asset_totals.total) > 0 ? 'text-green-600' : (asset_totals.total - comparative_asset_totals.total) < 0 ? 'text-red-600' : ''}>
+                                                {formatCurrency(asset_totals.total - comparative_asset_totals.total)}
+                                                {(asset_totals.total - comparative_asset_totals.total) !== 0 && (
+                                                    <span className="ml-1 text-xs">
+                                                        {(asset_totals.total - comparative_asset_totals.total) > 0 ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </span>
                                         </td>
                                     </>
                                 )}
@@ -514,7 +636,7 @@ export default function BalanceSheet({
                                 </td>
                             </tr>
 
-                            {liability_groups.map(group => renderAccountGroup(group))}
+                            {liability_groups.map(group => renderAccountGroup(group, 0, comparative_liability_groups))}
 
                             {/* Liability Totals */}
                             <tr className="bg-gray-50 font-semibold">
@@ -524,7 +646,14 @@ export default function BalanceSheet({
                                     <>
                                         <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_liability_totals.total)}</td>
                                         <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(liability_totals.total - comparative_liability_totals.total)}
+                                            <span className={(liability_totals.total - comparative_liability_totals.total) > 0 ? 'text-red-600' : (liability_totals.total - comparative_liability_totals.total) < 0 ? 'text-green-600' : ''}>
+                                                {formatCurrency(liability_totals.total - comparative_liability_totals.total)}
+                                                {(liability_totals.total - comparative_liability_totals.total) !== 0 && (
+                                                    <span className="ml-1 text-xs">
+                                                        {(liability_totals.total - comparative_liability_totals.total) > 0 ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </span>
                                         </td>
                                     </>
                                 )}
@@ -537,19 +666,34 @@ export default function BalanceSheet({
                                 </td>
                             </tr>
 
-                            {equity_groups.map(group => renderAccountGroup(group))}
+                            {equity_groups.map(group => renderAccountGroup(group, 0, comparative_equity_groups))}
 
                             {/* Net Profit */}
                             <tr>
-                                <td className="px-6 py-3 text-sm font-medium pl-10">
+                                <td className="px-6 py-3 text-sm font-medium" style={{ paddingLeft: '2.5rem' }}>
                                     Net Profit
                                 </td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(net_profit)}</td>
+                                <td className="px-6 py-3 text-sm text-right">
+                                    <span className={net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                        {formatCurrency(net_profit)}
+                                    </span>
+                                </td>
                                 {data.show_comparative && comparative_net_profit !== null && (
                                     <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_net_profit)}</td>
                                         <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(net_profit - comparative_net_profit)}
+                                            <span className={comparative_net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                {formatCurrency(comparative_net_profit)}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-3 text-sm text-right">
+                                            <span className={(net_profit - comparative_net_profit) > 0 ? 'text-green-600' : (net_profit - comparative_net_profit) < 0 ? 'text-red-600' : ''}>
+                                                {formatCurrency(net_profit - comparative_net_profit)}
+                                                {(net_profit - comparative_net_profit) !== 0 && (
+                                                    <span className="ml-1 text-xs">
+                                                        {(net_profit - comparative_net_profit) > 0 ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </span>
                                         </td>
                                     </>
                                 )}
@@ -563,7 +707,14 @@ export default function BalanceSheet({
                                     <>
                                         <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_equity_totals.total)}</td>
                                         <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(equity_totals.total - comparative_equity_totals.total)}
+                                            <span className={(equity_totals.total - comparative_equity_totals.total) > 0 ? 'text-green-600' : (equity_totals.total - comparative_equity_totals.total) < 0 ? 'text-red-600' : ''}>
+                                                {formatCurrency(equity_totals.total - comparative_equity_totals.total)}
+                                                {(equity_totals.total - comparative_equity_totals.total) !== 0 && (
+                                                    <span className="ml-1 text-xs">
+                                                        {(equity_totals.total - comparative_equity_totals.total) > 0 ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </span>
                                         </td>
                                     </>
                                 )}
@@ -590,28 +741,44 @@ export default function BalanceSheet({
                         </tbody>
                     </table>
                 </div>
+
+                {/* Balance Check */}
+                <div className="px-6 py-4 bg-gray-50 border-t">
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">Balance Check:</span>
+                        <span className={`text-sm font-medium ${Math.abs(asset_totals.total - (liability_totals.total + equity_totals.total)) < 0.01
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                            }`}>
+                            {Math.abs(asset_totals.total - (liability_totals.total + equity_totals.total)) < 0.01
+                                ? 'Balanced ✓'
+                                : `Out of Balance: ${formatCurrency(asset_totals.total - (liability_totals.total + equity_totals.total))}`
+                            }
+                        </span>
+                    </div>
+                </div>
             </div>
 
             {/* Print Styles */}
             <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-container, .print-container * {
-            visibility: visible;
-          }
-          .print-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-          button, .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
+                @media print {
+                    body * {
+                        visibility: hidden;
+                    }
+                    .print-container, .print-container * {
+                        visibility: visible;
+                    }
+                    .print-container {
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                    }
+                    button, .no-print {
+                        display: none !important;
+                    }
+                }
+            `}</style>
         </AppLayout>
     );
 }

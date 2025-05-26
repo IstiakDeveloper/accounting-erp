@@ -9,10 +9,10 @@ import {
   FileText,
   File,
   FileImage,
-  FilePdf,
+  FilePen,
   FileSpreadsheet,
   FileArchive,
-  FileWord,
+  FileDown,
   Calendar,
   User,
   Link as LinkIcon,
@@ -66,9 +66,9 @@ export default function DocumentShow({ document, documentable, download_url }: P
     if (fileType.includes('image/')) {
       return <FileImage className={`${iconSize} text-blue-500`} />;
     } else if (fileType.includes('pdf')) {
-      return <FilePdf className={`${iconSize} text-red-500`} />;
+      return <FilePen className={`${iconSize} text-red-500`} />;
     } else if (fileType.includes('word') || fileType.includes('document')) {
-      return <FileWord className={`${iconSize} text-blue-700`} />;
+      return <FileDown className={`${iconSize} text-blue-700`} />;
     } else if (fileType.includes('excel') || fileType.includes('spreadsheet')) {
       return <FileSpreadsheet className={`${iconSize} text-green-600`} />;
     } else if (fileType.includes('zip') || fileType.includes('compressed')) {
@@ -313,7 +313,7 @@ export default function DocumentShow({ document, documentable, download_url }: P
               </p>
               {documentable && (
                 <p className="mt-2">
-                  <strong>Attached To:</strong> This document is attached to a {document.documentable_type?.split('\\').pop().toLowerCase()}.
+                  <strong>Attached To:</strong> This document is attached to a {document.documentable_type?.split('\\\\').pop().toLowerCase()}.
                   When the related entity is deleted, this document may also be removed.
                 </p>
               )}
