@@ -167,8 +167,8 @@ export default function BalanceSheet({
         return undefined;
     };
 
-    // Recursive function to render account groups
-    const renderAccountGroup = (group: AccountGroup, depth = 0, comparativeGroups: AccountGroup[] | null = null) => {
+    // Recursive function to render account groups for left-right layout
+    const renderAccountGroupLeftRight = (group: AccountGroup, depth = 0, comparativeGroups: AccountGroup[] | null = null) => {
         const isExpanded = expandedGroups[group.id] || false;
         const hasChildren = group.children && group.children.length > 0;
         const hasLedgerAccounts = group.ledger_accounts && group.ledger_accounts.length > 0;
@@ -180,141 +180,396 @@ export default function BalanceSheet({
         const change = comparativeGroup ? group.balance - comparativeGroup.balance : 0;
 
         // Determine if this group should show its balance or just act as a container
-        const showGroupBalance = !hasChildren && !hasLedgerAccounts; // Only show balance if it's a leaf group with no sub-items
+        const showGroupBalance = !hasChildren && !hasLedgerAccounts;
 
-        return (
-            <React.Fragment key={group.id}>
-                {/* Group Header Row */}
-                <tr
-                    className={`hover:bg-gray-50 ${depth === 0 ? 'font-semibold' : ''} ${depth > 0 ? 'text-sm' : ''}`}
-                >
-                    <td
-                        className={`px-6 py-2`}
-                        style={{ paddingLeft: depth > 0 ? `${1.5 + (depth * 1)}rem` : '1.5rem' }}
-                    >
-                        <div className="flex items-center cursor-pointer"
-                            onClick={() => (hasChildren || hasLedgerAccounts) && toggleGroup(group.id)}>
-                            {(hasChildren || hasLedgerAccounts) && (
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleGroup(group.id);
-                                    }}
-                                    className="mr-2 focus:outline-none"
-                                >
-                                    {isExpanded ?
-                                        <ChevronDown className="h-4 w-4 text-gray-500" /> :
-                                        <ChevronRight className="h-4 w-4 text-gray-500" />
-                                    }
-                                </button>
-                            )}
-                            <span>{group.name}</span>
-                            {group.code && (
-                                <span className="ml-2 text-gray-500 text-xs">({group.code})</span>
-                            )}
-                        </div>
-                    </td>
-                    <td className="px-6 py-2 text-right">
-                        {/* শুধু leaf groups বা যাদের কোন children/ledger accounts নেই তাদের balance দেখাবো */}
-                        {showGroupBalance ? formatCurrency(group.balance) : ''}
-                    </td>
-                    {data.show_comparative && (
-                        <>
-                            <td className="px-6 py-2 text-right">
-                                {showGroupBalance && comparativeGroup ? formatCurrency(comparativeGroup.balance) : ''}
-                            </td>
-                            <td className="px-6 py-2 text-right">
-                                {showGroupBalance && (
-                                    <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
-                                        {formatCurrency(change)}
-                                        {change !== 0 && (
-                                            <span className="ml-1 text-xs">
-                                                {change > 0 ? '↑' : '↓'}
-                                            </span>
-                                        )}
-                                    </span>
-                                )}
-                            </td>
-                        </>
-                    )}
-                </tr>
+        const content = [];
 
-                {/* Render children if expanded */}
-                {isExpanded && hasChildren && group.children.map(child =>
-                    renderAccountGroup(child, depth + 1, comparativeGroup?.children)
+        // Group Header Row
+        content.push(
+            <tr key={group.id} className={`hover:bg-gray-50 ${depth === 0 ? 'font-semibold' : ''} ${depth > 0 ? 'text-sm' : ''}`}>
+                <td className={`px-4 py-2`} style={{ paddingLeft: depth > 0 ? `${1 + (depth * 1)}rem` : '1rem' }}>
+                    <div className="flex items-center cursor-pointer" onClick={() => (hasChildren || hasLedgerAccounts) && toggleGroup(group.id)}>
+                        {(hasChildren || hasLedgerAccounts) && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); toggleGroup(group.id); }} className="mr-2 focus:outline-none">
+                                {isExpanded ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+                            </button>
+                        )}
+                        <span>{group.name}</span>
+                        {group.code && <span className="ml-2 text-gray-500 text-xs">({group.code})</span>}
+                    </div>
+                </td>
+                <td className="px-4 py-2 text-right">
+                    {showGroupBalance ? formatCurrency(group.balance) : ''}
+                </td>
+                {data.show_comparative && (
+                    <>
+                        <td className="px-4 py-2 text-right">
+                            {showGroupBalance && comparativeGroup ? formatCurrency(comparativeGroup.balance) : ''}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                            {showGroupBalance && (
+                                <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
+                                    {formatCurrency(change)}
+                                    {change !== 0 && <span className="ml-1 text-xs">{change > 0 ? '↑' : '↓'}</span>}
+                                </span>
+                            )}
+                        </td>
+                    </>
                 )}
+            </tr>
+        );
 
-                {/* Render ledger accounts if expanded */}
-                {isExpanded && hasLedgerAccounts && group.ledger_accounts.map(account => {
-                    const comparativeLedgerAccount = comparativeGroup?.ledger_accounts?.find(ca => ca.id === account.id);
-                    const accountChange = comparativeLedgerAccount ? account.balance - comparativeLedgerAccount.balance : 0;
+        // Render children if expanded
+        if (isExpanded && hasChildren) {
+            group.children.forEach(child => {
+                content.push(...renderAccountGroupLeftRight(child, depth + 1, comparativeGroup?.children));
+            });
+        }
 
-                    return (
-                        <tr key={`ledger-${account.id}`} className="text-sm text-gray-600">
-                            <td className="px-6 py-1" style={{ paddingLeft: `${2 + (depth * 1)}rem` }}>
-                                <div className="flex items-center">
-                                    <span className="mr-2 text-gray-400">├─</span>
-                                    <span>{account.name}</span>
-                                    {account.code && (
-                                        <span className="ml-2 text-gray-400 text-xs">({account.code})</span>
-                                    )}
-                                </div>
-                            </td>
-                            <td className="px-6 py-1 text-right">
-                                {formatCurrency(account.balance)}
-                            </td>
-                            {data.show_comparative && (
-                                <>
-                                    <td className="px-6 py-1 text-right">
-                                        {comparativeLedgerAccount ? formatCurrency(comparativeLedgerAccount.balance) : formatCurrency(0)}
-                                    </td>
-                                    <td className="px-6 py-1 text-right">
-                                        <span className={accountChange > 0 ? 'text-green-600' : accountChange < 0 ? 'text-red-600' : ''}>
-                                            {formatCurrency(accountChange)}
-                                            {accountChange !== 0 && (
-                                                <span className="ml-1 text-xs">
-                                                    {accountChange > 0 ? '↑' : '↓'}
-                                                </span>
-                                            )}
-                                        </span>
-                                    </td>
-                                </>
-                            )}
-                        </tr>
-                    );
-                })}
+        // Render ledger accounts if expanded
+        if (isExpanded && hasLedgerAccounts) {
+            group.ledger_accounts.forEach(account => {
+                const comparativeLedgerAccount = comparativeGroup?.ledger_accounts?.find(ca => ca.id === account.id);
+                const accountChange = comparativeLedgerAccount ? account.balance - comparativeLedgerAccount.balance : 0;
 
-                {/* Show subtotal for groups that have children or ledger accounts */}
-                {isExpanded && (hasChildren || hasLedgerAccounts) && (
-                    <tr className="bg-gray-50 text-sm font-medium">
-                        <td className="px-6 py-2" style={{ paddingLeft: `${1.5 + (depth * 1)}rem` }}>
-                            <span className="text-gray-600">Total {group.name}</span>
+                content.push(
+                    <tr key={`ledger-${account.id}`} className="text-sm text-gray-600">
+                        <td className="px-4 py-1" style={{ paddingLeft: `${1.5 + (depth * 1)}rem` }}>
+                            <div className="flex items-center">
+                                <span className="mr-2 text-gray-400">├─</span>
+                                <span>{account.name}</span>
+                                {account.code && <span className="ml-2 text-gray-400 text-xs">({account.code})</span>}
+                            </div>
                         </td>
-                        <td className="px-6 py-2 text-right">
-                            {formatCurrency(group.balance)}
-                        </td>
+                        <td className="px-4 py-1 text-right">{formatCurrency(account.balance)}</td>
                         {data.show_comparative && (
                             <>
-                                <td className="px-6 py-2 text-right">
-                                    {comparativeGroup ? formatCurrency(comparativeGroup.balance) : formatCurrency(0)}
+                                <td className="px-4 py-1 text-right">
+                                    {comparativeLedgerAccount ? formatCurrency(comparativeLedgerAccount.balance) : formatCurrency(0)}
                                 </td>
-                                <td className="px-6 py-2 text-right">
-                                    <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
-                                        {formatCurrency(change)}
-                                        {change !== 0 && (
-                                            <span className="ml-1 text-xs">
-                                                {change > 0 ? '↑' : '↓'}
-                                            </span>
-                                        )}
+                                <td className="px-4 py-1 text-right">
+                                    <span className={accountChange > 0 ? 'text-green-600' : accountChange < 0 ? 'text-red-600' : ''}>
+                                        {formatCurrency(accountChange)}
+                                        {accountChange !== 0 && <span className="ml-1 text-xs">{accountChange > 0 ? '↑' : '↓'}</span>}
                                     </span>
                                 </td>
                             </>
                         )}
                     </tr>
-                )}
-            </React.Fragment>
-        );
+                );
+            });
+        }
+
+        // Show subtotal for groups that have children or ledger accounts
+        if (isExpanded && (hasChildren || hasLedgerAccounts)) {
+            content.push(
+                <tr key={`subtotal-${group.id}`} className="bg-gray-50 text-sm font-medium">
+                    <td className="px-4 py-2" style={{ paddingLeft: `${1 + (depth * 1)}rem` }}>
+                        <span className="text-gray-600">Total {group.name}</span>
+                    </td>
+                    <td className="px-4 py-2 text-right">{formatCurrency(group.balance)}</td>
+                    {data.show_comparative && (
+                        <>
+                            <td className="px-4 py-2 text-right">
+                                {comparativeGroup ? formatCurrency(comparativeGroup.balance) : formatCurrency(0)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                                <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
+                                    {formatCurrency(change)}
+                                    {change !== 0 && <span className="ml-1 text-xs">{change > 0 ? '↑' : '↓'}</span>}
+                                </span>
+                            </td>
+                        </>
+                    )}
+                </tr>
+            );
+        }
+
+        return content;
+    };
+
+    // Handle print with professional layout
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Balance Sheet</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 20px;
+                        color: #000;
+                        font-size: 12px;
+                    }
+                    .report-header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 15px;
+                    }
+                    .report-header h1 {
+                        font-size: 22px;
+                        margin: 0 0 10px 0;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                    }
+                    .report-header .subtitle {
+                        font-size: 14px;
+                        margin: 5px 0;
+                        color: #555;
+                    }
+                    .balance-sheet-container {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 20px;
+                    }
+                    .left-column, .right-column {
+                        flex: 1;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 6px 8px;
+                        text-align: left;
+                        vertical-align: top;
+                    }
+                    th {
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        font-size: 11px;
+                    }
+                    .text-right {
+                        text-align: right;
+                    }
+                    .section-header {
+                        background-color: #e9ecef;
+                        font-weight: bold;
+                        font-size: 13px;
+                    }
+                    .total-row {
+                        background-color: #f8f9fa;
+                        font-weight: bold;
+                        border-top: 2px solid #000;
+                    }
+                    .group-header {
+                        font-weight: 600;
+                    }
+                    .nested-account {
+                        padding-left: 20px;
+                        font-size: 11px;
+                    }
+                    .balance-check {
+                        margin-top: 20px;
+                        text-align: center;
+                        font-weight: bold;
+                        padding: 10px;
+                        border: 2px solid #000;
+                    }
+                    .balanced { color: #28a745; }
+                    .unbalanced { color: #dc3545; }
+                    @page {
+                        margin: 0.75in;
+                        size: A4;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="report-header">
+                    <h1>Balance Sheet</h1>
+                    <div class="subtitle">As of ${formatDate(data.as_of_date)}</div>
+                    <div class="subtitle">Financial Year: ${financial_year.name}</div>
+                    ${data.show_comparative && comparative_financial_year ? `<div class="subtitle">Comparative Period: ${comparative_financial_year.name}</div>` : ''}
+                </div>
+
+                <div class="balance-sheet-container">
+                    <div class="left-column">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th colspan="${data.show_comparative ? 4 : 2}" class="section-header">ASSETS</th>
+                                </tr>
+                                <tr>
+                                    <th style="width: 60%;">Account</th>
+                                    <th style="width: ${data.show_comparative ? '15%' : '40%'};" class="text-right">${formatDate(data.as_of_date)}</th>
+                                    ${data.show_comparative ? `
+                                    <th style="width: 15%;" class="text-right">${comparative_period_options[data.comparative_period]}</th>
+                                    <th style="width: 10%;" class="text-right">Change</th>
+                                    ` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+        `);
+
+        // Add Assets
+        asset_groups.forEach(group => {
+            const rows = renderAccountGroupLeftRight(group, 0, comparative_asset_groups);
+            rows.forEach((row, index) => {
+                if (React.isValidElement(row)) {
+                    const tdElements = row.props.children;
+                    printWindow.document.write('<tr>');
+                    if (Array.isArray(tdElements)) {
+                        tdElements.forEach((td: any) => {
+                            if (React.isValidElement(td)) {
+                                const className = td.props.className || '';
+                                const style = td.props.style || {};
+                                const paddingLeft = style.paddingLeft || '';
+                                printWindow.document.write(`<td class="${className}" style="padding-left: ${paddingLeft};">`);
+
+                                // Extract text content from td
+                                const extractText = (element: any): string => {
+                                    if (typeof element === 'string') return element;
+                                    if (typeof element === 'number') return element.toString();
+                                    if (React.isValidElement(element)) {
+                                        if (element.props.children) {
+                                            if (Array.isArray(element.props.children)) {
+                                                return element.props.children.map(extractText).join('');
+                                            }
+                                            return extractText(element.props.children);
+                                        }
+                                    }
+                                    return '';
+                                };
+
+                                printWindow.document.write(extractText(td.props.children));
+                                printWindow.document.write('</td>');
+                            }
+                        });
+                    }
+                    printWindow.document.write('</tr>');
+                }
+            });
+        });
+
+        printWindow.document.write(`
+                                <tr class="total-row">
+                                    <td>Total Assets</td>
+                                    <td class="text-right">${formatCurrency(asset_totals.total)}</td>
+                                    ${data.show_comparative && comparative_asset_totals ? `
+                                    <td class="text-right">${formatCurrency(comparative_asset_totals.total)}</td>
+                                    <td class="text-right">${formatCurrency(asset_totals.total - comparative_asset_totals.total)}</td>
+                                    ` : ''}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="right-column">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th colspan="${data.show_comparative ? 4 : 2}" class="section-header">LIABILITIES & EQUITY</th>
+                                </tr>
+                                <tr>
+                                    <th style="width: 60%;">Account</th>
+                                    <th style="width: ${data.show_comparative ? '15%' : '40%'};" class="text-right">${formatDate(data.as_of_date)}</th>
+                                    ${data.show_comparative ? `
+                                    <th style="width: 15%;" class="text-right">${comparative_period_options[data.comparative_period]}</th>
+                                    <th style="width: 10%;" class="text-right">Change</th>
+                                    ` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="section-header">
+                                    <td colspan="${data.show_comparative ? 4 : 2}">LIABILITIES</td>
+                                </tr>
+        `);
+
+        // Add simplified liabilities and equity for print
+        liability_groups.forEach(group => {
+            printWindow.document.write(`
+                <tr>
+                    <td style="padding-left: 1rem;">${group.name}${group.code ? ` (${group.code})` : ''}</td>
+                    <td class="text-right">${formatCurrency(group.balance)}</td>
+                    ${data.show_comparative ? `
+                    <td class="text-right">${formatCurrency(findComparativeGroup(comparative_liability_groups, group.id)?.balance || 0)}</td>
+                    <td class="text-right">${formatCurrency(group.balance - (findComparativeGroup(comparative_liability_groups, group.id)?.balance || 0))}</td>
+                    ` : ''}
+                </tr>
+            `);
+        });
+
+        printWindow.document.write(`
+                                <tr class="total-row">
+                                    <td>Total Liabilities</td>
+                                    <td class="text-right">${formatCurrency(liability_totals.total)}</td>
+                                    ${data.show_comparative && comparative_liability_totals ? `
+                                    <td class="text-right">${formatCurrency(comparative_liability_totals.total)}</td>
+                                    <td class="text-right">${formatCurrency(liability_totals.total - comparative_liability_totals.total)}</td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="section-header">
+                                    <td colspan="${data.show_comparative ? 4 : 2}">EQUITY</td>
+                                </tr>
+        `);
+
+        // Add equity groups
+        equity_groups.forEach(group => {
+            printWindow.document.write(`
+                <tr>
+                    <td style="padding-left: 1rem;">${group.name}${group.code ? ` (${group.code})` : ''}</td>
+                    <td class="text-right">${formatCurrency(group.balance)}</td>
+                    ${data.show_comparative ? `
+                    <td class="text-right">${formatCurrency(findComparativeGroup(comparative_equity_groups, group.id)?.balance || 0)}</td>
+                    <td class="text-right">${formatCurrency(group.balance - (findComparativeGroup(comparative_equity_groups, group.id)?.balance || 0))}</td>
+                    ` : ''}
+                </tr>
+            `);
+        });
+
+        printWindow.document.write(`
+                                <tr>
+                                    <td style="padding-left: 1rem;">Net Profit</td>
+                                    <td class="text-right">${formatCurrency(net_profit)}</td>
+                                    ${data.show_comparative && comparative_net_profit !== null ? `
+                                    <td class="text-right">${formatCurrency(comparative_net_profit)}</td>
+                                    <td class="text-right">${formatCurrency(net_profit - comparative_net_profit)}</td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="total-row">
+                                    <td>Total Equity</td>
+                                    <td class="text-right">${formatCurrency(equity_totals.total)}</td>
+                                    ${data.show_comparative && comparative_equity_totals ? `
+                                    <td class="text-right">${formatCurrency(comparative_equity_totals.total)}</td>
+                                    <td class="text-right">${formatCurrency(equity_totals.total - comparative_equity_totals.total)}</td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="total-row" style="border-top: 3px double #000;">
+                                    <td><strong>TOTAL LIABILITIES AND EQUITY</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(liability_totals.total + equity_totals.total)}</strong></td>
+                                    ${data.show_comparative && comparative_liability_totals && comparative_equity_totals ? `
+                                    <td class="text-right"><strong>${formatCurrency(comparative_liability_totals.total + comparative_equity_totals.total)}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency((liability_totals.total + equity_totals.total) - (comparative_liability_totals.total + comparative_equity_totals.total))}</strong></td>
+                                    ` : ''}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="balance-check ${Math.abs(asset_totals.total - (liability_totals.total + equity_totals.total)) < 0.01 ? 'balanced' : 'unbalanced'}">
+                    Balance Check: ${Math.abs(asset_totals.total - (liability_totals.total + equity_totals.total)) < 0.01
+                ? 'Balanced ✓'
+                : `Out of Balance: ${formatCurrency(asset_totals.total - (liability_totals.total + equity_totals.total))}`
+            }
+                </div>
+            </body>
+            </html>
+        `);
+
+        printWindow.document.close();
+        printWindow.print();
     };
 
     // Generate CSV export
@@ -408,12 +663,10 @@ export default function BalanceSheet({
             <Head title="Balance Sheet" />
 
             <div className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between">
-                <h1 className="text-2xl font-semibold text-gray-800">
-                    Balance Sheet
-                </h1>
+                <h1 className="text-2xl font-semibold text-gray-800">Balance Sheet</h1>
                 <div className="mt-4 lg:mt-0 flex flex-wrap gap-2">
                     <button
-                        onClick={() => window.print()}
+                        onClick={handlePrint}
                         className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                         <Printer className="h-4 w-4 mr-2" />
@@ -430,7 +683,7 @@ export default function BalanceSheet({
             </div>
 
             {/* Filters Section */}
-            <div className="bg-white shadow rounded-lg mb-6 overflow-hidden">
+            <div className="bg-white shadow rounded-lg mb-6 overflow-hidden no-print">
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium text-gray-700 flex items-center">
@@ -563,183 +816,208 @@ export default function BalanceSheet({
                     )}
                 </div>
 
-                {/* Balance Sheet Table */}
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th
-                                    scope="col"
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                    Account
-                                </th>
-                                <th
-                                    scope="col"
-                                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                    {formatDate(data.as_of_date)}
-                                </th>
-                                {data.show_comparative && (
-                                    <>
-                                        <th
-                                            scope="col"
-                                            className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                        >
-                                            {comparative_period_options[data.comparative_period]}
+                {/* Left-Right Balance Sheet Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+                    {/* Left Column - Assets */}
+                    <div className="bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th colSpan={data.show_comparative ? 4 : 2} className="px-4 py-3 text-center text-sm font-bold text-gray-700 uppercase">
+                                            ASSETS
                                         </th>
-                                        <th
-                                            scope="col"
-                                            className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                        >
-                                            Change
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Account
                                         </th>
-                                    </>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {/* ASSETS SECTION */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    ASSETS
-                                </td>
-                            </tr>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                            {formatDate(data.as_of_date)}
+                                        </th>
+                                        {data.show_comparative && (
+                                            <>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    {comparative_period_options[data.comparative_period]}
+                                                </th>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    Change
+                                                </th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {asset_groups.map(group => renderAccountGroupLeftRight(group, 0, comparative_asset_groups))}
 
-                            {asset_groups.map(group => renderAccountGroup(group, 0, comparative_asset_groups))}
-
-                            {/* Asset Totals */}
-                            <tr className="bg-gray-50 font-semibold">
-                                <td className="px-6 py-3 text-sm">Total Assets</td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(asset_totals.total)}</td>
-                                {data.show_comparative && comparative_asset_totals && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_asset_totals.total)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(asset_totals.total - comparative_asset_totals.total) > 0 ? 'text-green-600' : (asset_totals.total - comparative_asset_totals.total) < 0 ? 'text-red-600' : ''}>
-                                                {formatCurrency(asset_totals.total - comparative_asset_totals.total)}
-                                                {(asset_totals.total - comparative_asset_totals.total) !== 0 && (
-                                                    <span className="ml-1 text-xs">
-                                                        {(asset_totals.total - comparative_asset_totals.total) > 0 ? '↑' : '↓'}
+                                    {/* Asset Totals */}
+                                    <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                        <td className="px-4 py-3 text-sm">Total Assets</td>
+                                        <td className="px-4 py-3 text-sm text-right">{formatCurrency(asset_totals.total)}</td>
+                                        {data.show_comparative && comparative_asset_totals && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">{formatCurrency(comparative_asset_totals.total)}</td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={(asset_totals.total - comparative_asset_totals.total) > 0 ? 'text-green-600' : (asset_totals.total - comparative_asset_totals.total) < 0 ? 'text-red-600' : ''}>
+                                                        {formatCurrency(asset_totals.total - comparative_asset_totals.total)}
+                                                        {(asset_totals.total - comparative_asset_totals.total) !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {(asset_totals.total - comparative_asset_totals.total) > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                )}
-                                            </span>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Right Column - Liabilities & Equity */}
+                    <div className="bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th colSpan={data.show_comparative ? 4 : 2} className="px-4 py-3 text-center text-sm font-bold text-gray-700 uppercase">
+                                            LIABILITIES & EQUITY
+                                        </th>
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Account
+                                        </th>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                            {formatDate(data.as_of_date)}
+                                        </th>
+                                        {data.show_comparative && (
+                                            <>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    {comparative_period_options[data.comparative_period]}
+                                                </th>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    Change
+                                                </th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {/* LIABILITIES SECTION */}
+                                    <tr className="bg-gray-100">
+                                        <td colSpan={data.show_comparative ? 4 : 2} className="px-4 py-2 text-sm font-bold text-gray-700">
+                                            LIABILITIES
                                         </td>
-                                    </>
-                                )}
-                            </tr>
+                                    </tr>
 
-                            {/* LIABILITIES SECTION */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    LIABILITIES
-                                </td>
-                            </tr>
+                                    {liability_groups.map(group => renderAccountGroupLeftRight(group, 0, comparative_liability_groups))}
 
-                            {liability_groups.map(group => renderAccountGroup(group, 0, comparative_liability_groups))}
-
-                            {/* Liability Totals */}
-                            <tr className="bg-gray-50 font-semibold">
-                                <td className="px-6 py-3 text-sm">Total Liabilities</td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(liability_totals.total)}</td>
-                                {data.show_comparative && comparative_liability_totals && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_liability_totals.total)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(liability_totals.total - comparative_liability_totals.total) > 0 ? 'text-red-600' : (liability_totals.total - comparative_liability_totals.total) < 0 ? 'text-green-600' : ''}>
-                                                {formatCurrency(liability_totals.total - comparative_liability_totals.total)}
-                                                {(liability_totals.total - comparative_liability_totals.total) !== 0 && (
-                                                    <span className="ml-1 text-xs">
-                                                        {(liability_totals.total - comparative_liability_totals.total) > 0 ? '↑' : '↓'}
+                                    {/* Liability Totals */}
+                                    <tr className="bg-gray-50 font-semibold">
+                                        <td className="px-4 py-2 text-sm">Total Liabilities</td>
+                                        <td className="px-4 py-2 text-sm text-right">{formatCurrency(liability_totals.total)}</td>
+                                        {data.show_comparative && comparative_liability_totals && (
+                                            <>
+                                                <td className="px-4 py-2 text-sm text-right">{formatCurrency(comparative_liability_totals.total)}</td>
+                                                <td className="px-4 py-2 text-sm text-right">
+                                                    <span className={(liability_totals.total - comparative_liability_totals.total) > 0 ? 'text-red-600' : (liability_totals.total - comparative_liability_totals.total) < 0 ? 'text-green-600' : ''}>
+                                                        {formatCurrency(liability_totals.total - comparative_liability_totals.total)}
+                                                        {(liability_totals.total - comparative_liability_totals.total) !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {(liability_totals.total - comparative_liability_totals.total) > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                )}
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+
+                                    {/* EQUITY SECTION */}
+                                    <tr className="bg-gray-100">
+                                        <td colSpan={data.show_comparative ? 4 : 2} className="px-4 py-2 text-sm font-bold text-gray-700">
+                                            EQUITY
+                                        </td>
+                                    </tr>
+
+                                    {equity_groups.map(group => renderAccountGroupLeftRight(group, 0, comparative_equity_groups))}
+
+                                    {/* Net Profit */}
+                                    <tr>
+                                        <td className="px-4 py-2 text-sm font-medium" style={{ paddingLeft: '1.5rem' }}>
+                                            Net Profit
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-right">
+                                            <span className={net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                {formatCurrency(net_profit)}
                                             </span>
                                         </td>
-                                    </>
-                                )}
-                            </tr>
-
-                            {/* EQUITY SECTION */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    EQUITY
-                                </td>
-                            </tr>
-
-                            {equity_groups.map(group => renderAccountGroup(group, 0, comparative_equity_groups))}
-
-                            {/* Net Profit */}
-                            <tr>
-                                <td className="px-6 py-3 text-sm font-medium" style={{ paddingLeft: '2.5rem' }}>
-                                    Net Profit
-                                </td>
-                                <td className="px-6 py-3 text-sm text-right">
-                                    <span className={net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                        {formatCurrency(net_profit)}
-                                    </span>
-                                </td>
-                                {data.show_comparative && comparative_net_profit !== null && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={comparative_net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                {formatCurrency(comparative_net_profit)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(net_profit - comparative_net_profit) > 0 ? 'text-green-600' : (net_profit - comparative_net_profit) < 0 ? 'text-red-600' : ''}>
-                                                {formatCurrency(net_profit - comparative_net_profit)}
-                                                {(net_profit - comparative_net_profit) !== 0 && (
-                                                    <span className="ml-1 text-xs">
-                                                        {(net_profit - comparative_net_profit) > 0 ? '↑' : '↓'}
+                                        {data.show_comparative && comparative_net_profit !== null && (
+                                            <>
+                                                <td className="px-4 py-2 text-sm text-right">
+                                                    <span className={comparative_net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {formatCurrency(comparative_net_profit)}
                                                     </span>
-                                                )}
-                                            </span>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-
-                            {/* Equity Totals */}
-                            <tr className="bg-gray-50 font-semibold">
-                                <td className="px-6 py-3 text-sm">Total Equity</td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(equity_totals.total)}</td>
-                                {data.show_comparative && comparative_equity_totals && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_equity_totals.total)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(equity_totals.total - comparative_equity_totals.total) > 0 ? 'text-green-600' : (equity_totals.total - comparative_equity_totals.total) < 0 ? 'text-red-600' : ''}>
-                                                {formatCurrency(equity_totals.total - comparative_equity_totals.total)}
-                                                {(equity_totals.total - comparative_equity_totals.total) !== 0 && (
-                                                    <span className="ml-1 text-xs">
-                                                        {(equity_totals.total - comparative_equity_totals.total) > 0 ? '↑' : '↓'}
+                                                </td>
+                                                <td className="px-4 py-2 text-sm text-right">
+                                                    <span className={(net_profit - comparative_net_profit) > 0 ? 'text-green-600' : (net_profit - comparative_net_profit) < 0 ? 'text-red-600' : ''}>
+                                                        {formatCurrency(net_profit - comparative_net_profit)}
+                                                        {(net_profit - comparative_net_profit) !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {(net_profit - comparative_net_profit) > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                )}
-                                            </span>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
 
-                            {/* LIABILITIES + EQUITY TOTAL */}
-                            <tr className="bg-blue-50 font-bold">
-                                <td className="px-6 py-3 text-sm">TOTAL LIABILITIES AND EQUITY</td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(liability_totals.total + equity_totals.total)}</td>
-                                {data.show_comparative && comparative_liability_totals && comparative_equity_totals && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(comparative_liability_totals.total + comparative_equity_totals.total)}
-                                        </td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(
-                                                (liability_totals.total + equity_totals.total) -
-                                                (comparative_liability_totals.total + comparative_equity_totals.total)
-                                            )}
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-                        </tbody>
-                    </table>
+                                    {/* Equity Totals */}
+                                    <tr className="bg-gray-50 font-semibold">
+                                        <td className="px-4 py-2 text-sm">Total Equity</td>
+                                        <td className="px-4 py-2 text-sm text-right">{formatCurrency(equity_totals.total)}</td>
+                                        {data.show_comparative && comparative_equity_totals && (
+                                            <>
+                                                <td className="px-4 py-2 text-sm text-right">{formatCurrency(comparative_equity_totals.total)}</td>
+                                                <td className="px-4 py-2 text-sm text-right">
+                                                    <span className={(equity_totals.total - comparative_equity_totals.total) > 0 ? 'text-green-600' : (equity_totals.total - comparative_equity_totals.total) < 0 ? 'text-red-600' : ''}>
+                                                        {formatCurrency(equity_totals.total - comparative_equity_totals.total)}
+                                                        {(equity_totals.total - comparative_equity_totals.total) !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {(equity_totals.total - comparative_equity_totals.total) > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+
+                                    {/* LIABILITIES + EQUITY TOTAL */}
+                                    <tr className="bg-blue-50 font-bold border-t-2 border-gray-300">
+                                        <td className="px-4 py-3 text-sm">TOTAL LIABILITIES AND EQUITY</td>
+                                        <td className="px-4 py-3 text-sm text-right">{formatCurrency(liability_totals.total + equity_totals.total)}</td>
+                                        {data.show_comparative && comparative_liability_totals && comparative_equity_totals && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    {formatCurrency(comparative_liability_totals.total + comparative_equity_totals.total)}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    {formatCurrency(
+                                                        (liability_totals.total + equity_totals.total) -
+                                                        (comparative_liability_totals.total + comparative_equity_totals.total)
+                                                    )}
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Balance Check */}
@@ -762,20 +1040,12 @@ export default function BalanceSheet({
             {/* Print Styles */}
             <style jsx global>{`
                 @media print {
-                    body * {
-                        visibility: hidden;
-                    }
-                    .print-container, .print-container * {
-                        visibility: visible;
-                    }
-                    .print-container {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                    }
-                    button, .no-print {
+                    .no-print {
                         display: none !important;
+                    }
+                    body {
+                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact;
                     }
                 }
             `}</style>

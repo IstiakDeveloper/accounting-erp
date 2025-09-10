@@ -41,7 +41,10 @@ return new class extends Migration {
             $table->timestamps();
 
             // Unique constraint for business, financial year and calculation date
-            $table->unique(['business_id', 'financial_year_id', 'calculation_date']);
+            $table->unique(
+                ['business_id', 'financial_year_id', 'calculation_date'],
+                'uniq_fin_ratio_calc'
+            );
         });
     }
 

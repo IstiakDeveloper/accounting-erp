@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -25,9 +24,10 @@ return new class extends Migration
             $table->foreignId('completed_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
 
-            // Indexes for performance
-            $table->index(['business_id', 'ledger_account_id', 'statement_date']);
+            // Short custom index name
+            $table->index(['business_id', 'ledger_account_id', 'statement_date'], 'idx_biz_ledger_date');
         });
+
     }
 
     /**

@@ -5,6 +5,7 @@ use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SuperAdminMiddleware;
 use App\Http\Middleware\PermissionMiddleware;
+use App\Console\Commands\DatabaseUtility; // এই line add করো
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        DatabaseUtility::class,
+    ])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'theme']);
 
@@ -25,7 +29,6 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // Register middleware aliases
         $middleware->alias([
             'business' => BusinessMiddleware::class,
             'super_admin' => SuperAdminMiddleware::class,

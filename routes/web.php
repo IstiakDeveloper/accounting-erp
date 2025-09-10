@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\BankReconciliationController;
 use App\Http\Controllers\BudgetController;
 use App\Http\Controllers\BusinessController;
@@ -45,7 +46,7 @@ use Inertia\Inertia;
 
 // Public routes
 Route::get('/', function () {
-    return Inertia::render('welcome');
+    return redirect()->route('login');
 })->name('welcome');
 
 // Auth routes
@@ -402,6 +403,15 @@ Route::middleware(['auth', 'business'])->group(function () {
 
 });
 
+
+Route::middleware(['auth'])->prefix('admin')->group(function () {
+    Route::get('backup', [BackupController::class, 'index'])->name('backup.index');
+    Route::post('backup/create', [BackupController::class, 'createBackup'])->name('backup.create');
+    Route::get('backup/download/{filename}', [BackupController::class, 'downloadBackup'])->name('backup.download');
+    Route::delete('backup/{filename}', [BackupController::class, 'deleteBackup'])->name('backup.delete');
+    Route::post('backup/restore', [BackupController::class, 'restoreBackup'])->name('backup.restore');
+    Route::post('backup/migrate-sqlite', [BackupController::class, 'migrateSqlite'])->name('backup.migrate-sqlite');
+});
 
 
 // Health Check Routes

@@ -44,7 +44,7 @@ class JournalEntry extends Model
 
     public function ledgerAccount()
     {
-        return $this->belongsTo(LedgerAccount::class);
+        return $this->belongsTo(LedgerAccount::class, 'ledger_account_id');
     }
 
     public function reconciliationItems()
@@ -110,7 +110,7 @@ class JournalEntry extends Model
     {
         $query = self::where('business_id', $businessId)
             ->where('ledger_account_id', $ledgerAccountId)
-            ->with(['voucher' => function($query) {
+            ->with(['voucher' => function ($query) {
                 $query->with(['voucherType', 'party']);
             }]);
 
@@ -131,13 +131,17 @@ class JournalEntry extends Model
             ->get();
     }
 
-    // Get trial balance
+    // FIXED: Get trial balance with proper relationships
     public static function getTrialBalance($businessId, $date = null, $financialYearId = null)
     {
+        // Build the base query
         $query = self::where('business_id', $businessId)
-            ->selectRaw('ledger_account_id, SUM(debit_amount) as total_debit, SUM(credit_amount) as total_credit')
-            ->groupBy('ledger_account_id')
-            ->with('ledgerAccount.accountGroup');
+            ->selectRaw('
+            ledger_account_id,
+            SUM(debit_amount) as total_debit,
+            SUM(credit_amount) as total_credit
+        ')
+            ->groupBy('ledger_account_id');
 
         if ($date) {
             $query->where('date', '<=', $date);
@@ -147,6 +151,37 @@ class JournalEntry extends Model
             $query->where('financial_year_id', $financialYearId);
         }
 
-        return $query->get();
+        // Get aggregated data
+        $results = $query->get();
+
+        // Load relationships for each result
+        $trialBalance = collect();
+
+        foreach ($results as $result) {
+            // Find the ledger account with relationships
+            $ledgerAccount = LedgerAccount::with('accountGroup')
+                ->where('business_id', $businessId)
+                ->where('is_active', true)
+                ->find($result->ledger_account_id);
+
+            if ($ledgerAccount) {
+                // Create entry with proper structure
+                $entry = new self();
+                $entry->ledger_account_id = $result->ledger_account_id;
+                $entry->total_debit = $result->total_debit;
+                $entry->total_credit = $result->total_credit;
+                $entry->setRelation('ledgerAccount', $ledgerAccount);
+
+                $trialBalance->push($entry);
+            } else {
+                // Log missing accounts for debugging
+                \Log::warning("Missing ledger account for trial balance", [
+                    'ledger_account_id' => $result->ledger_account_id,
+                    'business_id' => $businessId
+                ]);
+            }
+        }
+
+        return $trialBalance;
     }
 }

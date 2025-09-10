@@ -14,12 +14,13 @@ return new class extends Migration {
             $table->id();
             $table->foreignId('account_reconciliation_id')->constrained()->onDelete('cascade');
             $table->foreignId('journal_entry_id')->constrained()->onDelete('cascade');
-            $table->boolean('is_reconciled')->default(false);
+            $table->decimal('amount', 15, 2);
             $table->timestamps();
 
-            // Unique constraint for reconciliation and journal entry
-            $table->unique(['account_reconciliation_id', 'journal_entry_id']);
+            // Fix long index name issue with custom name
+            $table->unique(['account_reconciliation_id', 'journal_entry_id'], 'uniq_recon_journal');
         });
+
     }
 
     /**

@@ -23,6 +23,9 @@ class ReportController extends Controller
     /**
      * Display the trial balance report.
      */
+    /**
+     * Display the trial balance report.
+     */
     public function trialBalance(Request $request)
     {
         $businessId = session('current_business_id');
@@ -60,27 +63,53 @@ class ReportController extends Controller
         $showZeroBalances = $request->show_zero_balances ?? false;
         $groupBy = $request->group_by ?? 'account_group';
 
-        // Get trial balance
+        // Get trial balance with proper relationships loaded
         $trialBalance = JournalEntry::getTrialBalance($businessId, $asOfDate, $financialYearId);
+
+        // Add opening balances to each entry
+        foreach ($trialBalance as $entry) {
+            if ($entry->ledgerAccount && $entry->ledgerAccount->opening_balance > 0) {
+                // Check if there's no opening balance entry in journal entries
+                $openingEntryExists = JournalEntry::where('business_id', $businessId)
+                    ->where('ledger_account_id', $entry->ledgerAccount->id)
+                    ->where('narration', 'LIKE', '%Opening Balance%')
+                    ->exists();
+
+                if (!$openingEntryExists) {
+                    if ($entry->ledgerAccount->opening_balance_type === 'debit') {
+                        $entry->total_debit += $entry->ledgerAccount->opening_balance;
+                    } else {
+                        $entry->total_credit += $entry->ledgerAccount->opening_balance;
+                    }
+                }
+            }
+        }
 
         // Filter out zero balances if requested
         if (!$showZeroBalances) {
             $trialBalance = $trialBalance->filter(function ($entry) {
-                return $entry->total_debit != $entry->total_credit;
+                return abs($entry->total_debit - $entry->total_credit) > 0.01;
             });
         }
 
         // Group by account group if requested
         if ($groupBy == 'account_group') {
-            $trialBalance = $trialBalance->groupBy(function ($entry) {
+            // Filter out entries without ledgerAccount or accountGroup first
+            $validEntries = $trialBalance->filter(function ($entry) {
+                return $entry->ledgerAccount && $entry->ledgerAccount->accountGroup;
+            });
+
+            $groupedEntries = $validEntries->groupBy(function ($entry) {
                 return $entry->ledgerAccount->accountGroup->id;
             });
 
             // Calculate totals for each group
             $groupedBalance = [];
 
-            foreach ($trialBalance as $groupId => $entries) {
+            foreach ($groupedEntries as $groupId => $entries) {
                 $group = AccountGroup::find($groupId);
+
+                if (!$group) continue; // Skip if group not found
 
                 $totalDebit = 0;
                 $totalCredit = 0;
@@ -92,13 +121,18 @@ class ReportController extends Controller
 
                 $groupedBalance[] = [
                     'group' => $group,
-                    'accounts' => $entries,
+                    'accounts' => $entries->values(), // Reset array keys
                     'total_debit' => $totalDebit,
                     'total_credit' => $totalCredit,
                 ];
             }
 
             $trialBalance = collect($groupedBalance);
+        } else {
+            // Filter out entries without ledgerAccount for non-grouped view
+            $trialBalance = $trialBalance->filter(function ($entry) {
+                return $entry->ledgerAccount !== null;
+            })->values(); // Reset array keys
         }
 
         // Calculate grand totals
@@ -1852,5 +1886,4 @@ class ReportController extends Controller
             ],
         ]);
     }
-
 }

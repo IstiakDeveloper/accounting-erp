@@ -552,7 +552,7 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                 <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
                     <Link href="/dashboard" className="flex items-center space-x-2">
                         <div className="flex items-center justify-center w-8 h-8 bg-indigo-600 rounded-lg">
-                            <span className="text-white font-bold text-sm">T</span>
+                            <span className="text-white font-bold text-sm"><img src="/logo.png" alt="" /></span>
                         </div>
                         <span className="text-xl font-bold text-indigo-600">
                             {auth.user.is_super_admin ? 'Super Admin' : 'TallyERP'}

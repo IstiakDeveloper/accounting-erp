@@ -5,8 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -23,8 +22,12 @@ return new class extends Migration
             ]);
         }
 
-        // Before inserting account groups, disable foreign key constraints temporarily
-        DB::statement('PRAGMA foreign_keys = OFF;');
+        $driver = DB::getDriverName();
+        if ($driver === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        } elseif ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = OFF;');
+        }
 
         try {
             // First, insert top-level parent groups (with null parent_id)
@@ -312,8 +315,12 @@ return new class extends Migration
                 ],
             ]);
         } finally {
-            // Re-enable foreign key constraints
-            DB::statement('PRAGMA foreign_keys = ON;');
+            // Always re-enable foreign key checks after inserts
+            if ($driver === 'mysql') {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            } elseif ($driver === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys = ON;');
+            }
         }
     }
 

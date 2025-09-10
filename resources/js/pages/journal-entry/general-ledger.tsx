@@ -64,8 +64,8 @@ interface JournalEntry {
   voucher_id: number;
   ledger_account_id: number;
   date: string;
-  debit_amount: number;
-  credit_amount: number;
+  debit_amount: number | string;
+  credit_amount: number | string;
   narration: string | null;
   voucher: Voucher;
 }
@@ -73,7 +73,7 @@ interface JournalEntry {
 interface Props {
   account: LedgerAccount;
   journal_entries: JournalEntry[];
-  opening_balance: number;
+  opening_balance: number | string;
   opening_balance_type: 'debit' | 'credit';
   financial_years: FinancialYear[];
   filters: {
@@ -95,6 +95,36 @@ export default function JournalEntryGeneralLedger({
     filters.financial_year_id || filters.start_date || filters.end_date
   );
 
+  // Debug function
+  const debugData = () => {
+    console.log('=== GENERAL LEDGER DEBUG ===');
+    console.log('Account:', account.name);
+    console.log('Account Group Nature:', account.account_group?.nature);
+    console.log('Opening Balance:', opening_balance, typeof opening_balance);
+    console.log('Opening Balance Type:', opening_balance_type);
+    console.log('Journal Entries:', journal_entries);
+    console.log('Journal Entries Length:', journal_entries.length);
+
+    // Check first few entries
+    journal_entries.slice(0, 3).forEach((entry, index) => {
+      console.log(`Entry ${index + 1}:`, {
+        date: entry.date,
+        debit: entry.debit_amount,
+        debit_type: typeof entry.debit_amount,
+        credit: entry.credit_amount,
+        credit_type: typeof entry.credit_amount,
+        voucher: entry.voucher?.voucher_number
+      });
+    });
+
+    console.log('========================');
+  };
+
+  // Call debug on mount and when data changes
+  React.useEffect(() => {
+    debugData();
+  }, [journal_entries, opening_balance]);
+
   // Format date
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -105,98 +135,93 @@ export default function JournalEntryGeneralLedger({
     });
   };
 
-  // Format currency
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-US', {
+  // Format currency - FIXED VERSION
+  const formatCurrency = (amount: number | string): string => {
+    const validAmount = parseFloat(amount.toString()) || 0;
+    const formattedNumber = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(amount);
+    }).format(validAmount);
+
+    return `৳${formattedNumber}`;
   };
 
-  // Calculate running balance
+  // FIXED Calculate running balance function
   const calculateRunningBalance = () => {
-    let balance = opening_balance;
-    let balanceType = opening_balance_type;
+    console.log('=== GENERAL LEDGER BALANCE CALCULATION ===');
+    console.log('Account:', account.name);
+    console.log('Account Group Nature:', account.account_group?.nature);
+    console.log('Opening balance:', opening_balance, typeof opening_balance);
+    console.log('Opening balance type:', opening_balance_type);
+
+    // Convert opening balance to number
+    const openingBalanceNum = parseFloat(opening_balance.toString()) || 0;
 
     // Handle different account types (assets/expenses vs liabilities/income/equity)
     const isDebitNatureAccount = ['assets', 'expense'].includes(account.account_group?.nature);
+    console.log('Is debit nature account:', isDebitNatureAccount);
 
-    const entriesWithBalance = journal_entries.map(entry => {
+    // Start with opening balance as signed number
+    // For debit nature accounts: positive = debit, negative = credit
+    // For credit nature accounts: positive = credit, negative = debit
+    let runningBalance = isDebitNatureAccount
+      ? (opening_balance_type === 'debit' ? openingBalanceNum : -openingBalanceNum)
+      : (opening_balance_type === 'credit' ? openingBalanceNum : -openingBalanceNum);
+
+    console.log('Initial running balance (signed):', runningBalance);
+
+    const entriesWithBalance = journal_entries.map((entry, index) => {
+      const prevBalance = runningBalance;
+
+      // Convert string amounts to numbers
+      const debitAmount = parseFloat(entry.debit_amount.toString()) || 0;
+      const creditAmount = parseFloat(entry.credit_amount.toString()) || 0;
+
+      console.log(`\n--- Processing Entry ${index + 1} ---`);
+      console.log('Original amounts:', { debit: entry.debit_amount, credit: entry.credit_amount });
+      console.log('Parsed amounts:', { debit: debitAmount, credit: creditAmount });
+      console.log('Previous balance:', prevBalance);
+
       if (isDebitNatureAccount) {
-        // For assets and expenses:
-        // Debits increase the balance, credits decrease it
-        if (entry.debit_amount > 0) {
-          if (balanceType === 'debit') {
-            balance += entry.debit_amount;
-          } else {
-            balance -= entry.debit_amount;
-            // If balance becomes negative, flip the type
-            if (balance < 0) {
-              balance = Math.abs(balance);
-              balanceType = 'debit';
-            }
-          }
-        } else if (entry.credit_amount > 0) {
-          if (balanceType === 'debit') {
-            balance -= entry.credit_amount;
-            // If balance becomes negative, flip the type
-            if (balance < 0) {
-              balance = Math.abs(balance);
-              balanceType = 'credit';
-            }
-          } else {
-            balance += entry.credit_amount;
-          }
-        }
+        // For assets and expenses: Debit increases balance, Credit decreases balance
+        runningBalance = runningBalance + debitAmount - creditAmount;
       } else {
-        // For liabilities, income, and equity:
-        // Credits increase the balance, debits decrease it
-        if (entry.credit_amount > 0) {
-          if (balanceType === 'credit') {
-            balance += entry.credit_amount;
-          } else {
-            balance -= entry.credit_amount;
-            // If balance becomes negative, flip the type
-            if (balance < 0) {
-              balance = Math.abs(balance);
-              balanceType = 'credit';
-            }
-          }
-        } else if (entry.debit_amount > 0) {
-          if (balanceType === 'credit') {
-            balance -= entry.debit_amount;
-            // If balance becomes negative, flip the type
-            if (balance < 0) {
-              balance = Math.abs(balance);
-              balanceType = 'debit';
-            }
-          } else {
-            balance += entry.debit_amount;
-          }
-        }
+        // For liabilities, income, and equity: Credit increases balance, Debit decreases balance
+        runningBalance = runningBalance + creditAmount - debitAmount;
       }
+
+      const balanceAmount = Math.abs(runningBalance);
+      const balanceType = isDebitNatureAccount
+        ? (runningBalance >= 0 ? 'debit' : 'credit')
+        : (runningBalance >= 0 ? 'credit' : 'debit');
+
+      console.log('New running balance:', runningBalance);
+      console.log('Display balance:', balanceAmount, balanceType);
 
       return {
         ...entry,
-        running_balance: balance,
+        running_balance: balanceAmount,
         running_balance_type: balanceType,
       };
     });
 
+    console.log('=== CALCULATION COMPLETE ===');
     return entriesWithBalance;
   };
 
   const entriesWithBalance = calculateRunningBalance();
   const finalBalance = entriesWithBalance.length > 0
     ? entriesWithBalance[entriesWithBalance.length - 1].running_balance
-    : opening_balance;
+    : parseFloat(opening_balance.toString()) || 0;
   const finalBalanceType = entriesWithBalance.length > 0
     ? entriesWithBalance[entriesWithBalance.length - 1].running_balance_type
     : opening_balance_type;
 
-  // Calculate totals
-  const totalDebits = entriesWithBalance.reduce((sum, entry) => sum + (entry.debit_amount || 0), 0);
-  const totalCredits = entriesWithBalance.reduce((sum, entry) => sum + (entry.credit_amount || 0), 0);
+  // Calculate totals - FIXED VERSION
+  const totalDebits = entriesWithBalance.reduce((sum, entry) =>
+    sum + (parseFloat(entry.debit_amount.toString()) || 0), 0);
+  const totalCredits = entriesWithBalance.reduce((sum, entry) =>
+    sum + (parseFloat(entry.credit_amount.toString()) || 0), 0);
 
   // Get the icon for the account nature
   const getAccountNatureIcon = () => {
@@ -445,10 +470,10 @@ export default function JournalEntryGeneralLedger({
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 text-right">
-                          {entry.debit_amount > 0 ? formatCurrency(entry.debit_amount) : ''}
+                          {parseFloat(entry.debit_amount.toString()) > 0 ? formatCurrency(entry.debit_amount) : ''}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 text-right">
-                          {entry.credit_amount > 0 ? formatCurrency(entry.credit_amount) : ''}
+                          {parseFloat(entry.credit_amount.toString()) > 0 ? formatCurrency(entry.credit_amount) : ''}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 text-right">
                           {formatCurrency(entry.running_balance)} {entry.running_balance_type === 'debit' ? 'Dr' : 'Cr'}

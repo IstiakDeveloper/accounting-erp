@@ -41,7 +41,7 @@ class JournalEntryController extends Controller
         }
 
         if ($voucherTypeId) {
-            $journalEntries->whereHas('voucher', function($query) use ($voucherTypeId) {
+            $journalEntries->whereHas('voucher', function ($query) use ($voucherTypeId) {
                 $query->where('voucher_type_id', $voucherTypeId);
             });
         }
@@ -55,16 +55,16 @@ class JournalEntryController extends Controller
         }
 
         if ($search) {
-            $journalEntries->where(function($query) use ($search) {
+            $journalEntries->where(function ($query) use ($search) {
                 $query->where('narration', 'like', '%' . $search . '%')
-                    ->orWhereHas('ledgerAccount', function($q) use ($search) {
+                    ->orWhereHas('ledgerAccount', function ($q) use ($search) {
                         $q->where('name', 'like', '%' . $search . '%');
                     })
-                    ->orWhereHas('voucher', function($q) use ($search) {
+                    ->orWhereHas('voucher', function ($q) use ($search) {
                         $q->where('voucher_number', 'like', '%' . $search . '%')
                             ->orWhere('narration', 'like', '%' . $search . '%')
                             ->orWhere('reference', 'like', '%' . $search . '%')
-                            ->orWhereHas('party', function($p) use ($search) {
+                            ->orWhereHas('party', function ($p) use ($search) {
                                 $p->where('name', 'like', '%' . $search . '%');
                             });
                     });
@@ -198,9 +198,10 @@ class JournalEntryController extends Controller
         $endDate = $request->end_date;
         $accountId = $request->account_id;
 
-        // Get cash and bank accounts
-        $cashAndBankAccounts = LedgerAccount::where('business_id', $businessId)
-            ->where(function($query) {
+        // Get cash and bank accounts WITH account group
+        $cashAndBankAccounts = LedgerAccount::with('accountGroup') // এটা add করুন
+            ->where('business_id', $businessId)
+            ->where(function ($query) {
                 $query->where('is_cash_account', true)
                     ->orWhere('is_bank_account', true);
             })
@@ -218,33 +219,18 @@ class JournalEntryController extends Controller
         $openingBalanceType = 'debit';
 
         if ($accountId) {
-            $account = LedgerAccount::findOrFail($accountId);
+            $account = LedgerAccount::with('accountGroup')->findOrFail($accountId); // এটাও add করুন
 
             if ($account->business_id != $businessId) {
                 return redirect()->route('journal_entry.cash_book');
             }
 
-            // Calculate opening balance
+            // Calculate opening balance using the model method
             if ($startDate) {
-                $openingEntries = JournalEntry::where('business_id', $businessId)
-                    ->where('ledger_account_id', $accountId)
-                    ->where('date', '<', $startDate)
-                    ->selectRaw('SUM(debit_amount) as total_debit, SUM(credit_amount) as total_credit')
-                    ->first();
-
-                $totalDebit = $openingEntries->total_debit ?? 0;
-                $totalCredit = $openingEntries->total_credit ?? 0;
-
-                // Add opening balance from account
-                if ($account->opening_balance_type == 'debit') {
-                    $totalDebit += $account->opening_balance;
-                } else {
-                    $totalCredit += $account->opening_balance;
-                }
-
-                $openingBalance = $totalDebit - $totalCredit;
-                $openingBalanceType = $openingBalance >= 0 ? 'debit' : 'credit';
-                $openingBalance = abs($openingBalance);
+                // Get opening balance before start date
+                $openingData = $account->getBalance($startDate);
+                $openingBalance = $openingData['balance'];
+                $openingBalanceType = $openingData['balance_type'];
             } else {
                 // Just use the account's opening balance
                 $openingBalance = $account->opening_balance;
@@ -274,7 +260,7 @@ class JournalEntryController extends Controller
             'journal_entries' => $journalEntries,
             'opening_balance' => $openingBalance,
             'opening_balance_type' => $openingBalanceType,
-            'selected_account' => $accountId ? LedgerAccount::find($accountId) : null,
+            'selected_account' => $accountId ? LedgerAccount::with('accountGroup')->find($accountId) : null, // এটাও add করুন
             'filters' => [
                 'account_id' => $accountId,
                 'start_date' => $startDate,
@@ -305,7 +291,7 @@ class JournalEntryController extends Controller
                 ->get();
 
             // Group ledger accounts by account group
-            $groupedAccounts = $ledgerAccounts->groupBy(function($account) {
+            $groupedAccounts = $ledgerAccounts->groupBy(function ($account) {
                 return $account->accountGroup->name;
             });
 
