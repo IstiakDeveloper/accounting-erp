@@ -357,7 +357,7 @@ Route::middleware(['auth', 'business'])->group(function () {
         Route::get('/create', [UserBusinessController::class, 'create'])->name('create');
         Route::post('/', [UserBusinessController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [UserBusinessController::class, 'edit'])->name('edit');
-        Route::post('/{id}', [UserBusinessController::class, 'update'])->name('update');
+        Route::put('/{id}', [UserBusinessController::class, 'update'])->name('update');
         Route::delete('/{id}', [UserBusinessController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/make-owner', [UserBusinessController::class, 'makeOwner'])->name('make_owner');
         Route::post('/{id}/make-admin', [UserBusinessController::class, 'makeAdmin'])->name('make_admin');

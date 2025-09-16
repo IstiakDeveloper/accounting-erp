@@ -123,6 +123,14 @@ export default function TrialBalance({
         return `৳${formattedNumber}`;
     };
 
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
     // Handle filter submission
     const applyFilters = () => {
         get(route('report.trial_balance'), {
@@ -342,7 +350,7 @@ export default function TrialBalance({
                 <div class="report-header">
                     <h1>Trial Balance</h1>
                     <div class="subtitle">As of ${new Date(data.as_of_date).toLocaleDateString()}</div>
-                    <div class="date-info">Financial Year: ${financial_year.name}</div>
+                    <div class="date-info">Financial Year: ${formatDate(financial_year.start_date)} to ${formatDate(financial_year.end_date)}</div>
                 </div>
                 <table>
                     <thead>
@@ -519,7 +527,7 @@ export default function TrialBalance({
                             >
                                 {financial_years.map((fy) => (
                                     <option key={fy.id} value={fy.id}>
-                                        {fy.name}
+                                        {formatDate(fy.start_date)} to {formatDate(fy.end_date)}
                                     </option>
                                 ))}
                             </select>
@@ -626,7 +634,7 @@ export default function TrialBalance({
                             As of {new Date(data.as_of_date).toLocaleDateString()}
                         </p>
                         <p className="text-center text-gray-500">
-                            Financial Year: {financial_year.name}
+                            Financial Year: {formatDate(financial_year.start_date)} to {formatDate(financial_year.end_date)}
                         </p>
                     </div>
                 </div>

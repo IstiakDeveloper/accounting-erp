@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -10,7 +10,8 @@ import {
     ArrowDownCircle,
     ArrowUpCircle,
     DollarSign,
-    TrendingUp
+    TrendingUp,
+    TrendingDown
 } from 'lucide-react';
 
 interface FinancialYear {
@@ -77,7 +78,7 @@ export default function CashFlow({
         const formattedNumber = new Intl.NumberFormat('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
-        }).format(amount);
+        }).format(Math.abs(amount));
 
         return `৳${formattedNumber}`;
     };
@@ -110,6 +111,250 @@ export default function CashFlow({
         });
     };
 
+    // Handle print with professional layout
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Cash Flow Statement</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 20px;
+                        color: #000;
+                        font-size: 12px;
+                    }
+                    .report-header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 15px;
+                    }
+                    .report-header h1 {
+                        font-size: 22px;
+                        margin: 0 0 10px 0;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                    }
+                    .report-header .subtitle {
+                        font-size: 14px;
+                        margin: 5px 0;
+                        color: #555;
+                    }
+                    .cash-flow-container {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 20px;
+                    }
+                    .left-column, .right-column {
+                        flex: 1;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 8px;
+                        text-align: left;
+                        vertical-align: top;
+                    }
+                    th {
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        font-size: 11px;
+                    }
+                    .text-right {
+                        text-align: right;
+                    }
+                    .section-header {
+                        background-color: #e9ecef;
+                        font-weight: bold;
+                        font-size: 13px;
+                    }
+                    .total-row {
+                        background-color: #f8f9fa;
+                        font-weight: bold;
+                        border-top: 2px solid #000;
+                    }
+                    .net-cash-flow {
+                        background-color: #e3f2fd;
+                        font-weight: bold;
+                        border: 3px double #000;
+                    }
+                    .positive { color: #28a745; }
+                    .negative { color: #dc3545; }
+                    .summary-box {
+                        margin-top: 20px;
+                        border: 2px solid #000;
+                        padding: 15px;
+                        background-color: #f9f9f9;
+                        text-align: center;
+                    }
+                    @page {
+                        margin: 0.75in;
+                        size: A4;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="report-header">
+                    <h1>Cash Flow Statement</h1>
+                    <div class="subtitle">For the period: ${formatDate(data.from_date)} to ${formatDate(data.to_date)}</div>
+                    <div class="subtitle">Financial Year: ${formatDate(financial_year.start_date)} to ${formatDate(financial_year.end_date)}</div>
+                    ${data.show_comparative && comparative_financial_year ? `<div class="subtitle">Comparative Period: ${formatDate(comparative_financial_year.start_date)} to ${formatDate(comparative_financial_year.end_date)}</div>` : ''}
+                </div>
+
+                <div class="cash-flow-container">
+                    <div class="left-column">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th colspan="${data.show_comparative ? 4 : 2}" class="section-header">CASH INFLOWS</th>
+                                </tr>
+                                <tr>
+                                    <th style="width: 60%;">Item</th>
+                                    <th style="width: ${data.show_comparative ? '15%' : '40%'};" class="text-right">Current Period</th>
+                                    ${data.show_comparative ? `
+                                    <th style="width: 15%;" class="text-right">${comparative_period_options[data.comparative_period]}</th>
+                                    <th style="width: 10%;" class="text-right">Change</th>
+                                    ` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="section-header">
+                                    <td colspan="${data.show_comparative ? 4 : 2}">OPENING BALANCE</td>
+                                </tr>
+                                <tr>
+                                    <td>Cash & Bank Opening Balance</td>
+                                    <td class="text-right">${formatCurrency(opening_balance)}</td>
+                                    ${data.show_comparative && comparative_opening_balance !== null ? `
+                                    <td class="text-right">${formatCurrency(comparative_opening_balance)}</td>
+                                    <td class="text-right">${formatCurrency(Math.abs(opening_balance - comparative_opening_balance))}${opening_balance - comparative_opening_balance !== 0 ? (opening_balance - comparative_opening_balance > 0 ? ' ↑' : ' ↓') : ''}</td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="section-header">
+                                    <td colspan="${data.show_comparative ? 4 : 2}">OPERATING ACTIVITIES</td>
+                                </tr>
+                                <tr>
+                                    <td>Net Profit</td>
+                                    <td class="text-right ${net_profit >= 0 ? 'positive' : 'negative'}">${formatCurrency(net_profit)}</td>
+                                    ${data.show_comparative && comparative_net_profit !== null ? `
+                                    <td class="text-right ${comparative_net_profit >= 0 ? 'positive' : 'negative'}">${formatCurrency(comparative_net_profit)}</td>
+                                    <td class="text-right">${formatCurrency(Math.abs(net_profit - comparative_net_profit))}${net_profit - comparative_net_profit !== 0 ? (net_profit - comparative_net_profit > 0 ? ' ↑' : ' ↓') : ''}</td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="total-row">
+                                    <td><strong>Total Cash Inflows</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(opening_balance + Math.max(0, net_profit))}</strong></td>
+                                    ${data.show_comparative && comparative_opening_balance !== null && comparative_net_profit !== null ? `
+                                    <td class="text-right"><strong>${formatCurrency(comparative_opening_balance + Math.max(0, comparative_net_profit))}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs((opening_balance + Math.max(0, net_profit)) - (comparative_opening_balance + Math.max(0, comparative_net_profit))))}</strong></td>
+                                    ` : ''}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="right-column">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th colspan="${data.show_comparative ? 4 : 2}" class="section-header">CASH OUTFLOWS</th>
+                                </tr>
+                                <tr>
+                                    <th style="width: 60%;">Item</th>
+                                    <th style="width: ${data.show_comparative ? '15%' : '40%'};" class="text-right">Current Period</th>
+                                    ${data.show_comparative ? `
+                                    <th style="width: 15%;" class="text-right">${comparative_period_options[data.comparative_period]}</th>
+                                    <th style="width: 10%;" class="text-right">Change</th>
+                                    ` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="section-header">
+                                    <td colspan="${data.show_comparative ? 4 : 2}">OPERATING EXPENSES</td>
+                                </tr>
+                                <tr>
+                                    <td>Net Loss (if any)</td>
+                                    <td class="text-right negative">${net_profit < 0 ? formatCurrency(Math.abs(net_profit)) : formatCurrency(0)}</td>
+                                    ${data.show_comparative && comparative_net_profit !== null ? `
+                                    <td class="text-right negative">${comparative_net_profit < 0 ? formatCurrency(Math.abs(comparative_net_profit)) : formatCurrency(0)}</td>
+                                    <td class="text-right">${formatCurrency(Math.abs(Math.min(0, net_profit) - Math.min(0, comparative_net_profit || 0)))}</td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="total-row">
+                                    <td><strong>Total Cash Outflows</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(Math.min(0, net_profit)))}</strong></td>
+                                    ${data.show_comparative && comparative_net_profit !== null ? `
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(Math.min(0, comparative_net_profit)))}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(Math.abs(Math.min(0, net_profit)) - Math.abs(Math.min(0, comparative_net_profit))))}</strong></td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="section-header">
+                                    <td colspan="${data.show_comparative ? 4 : 2}">CLOSING BALANCE</td>
+                                </tr>
+                                <tr>
+                                    <td>Cash & Bank Closing Balance</td>
+                                    <td class="text-right">${formatCurrency(closing_balance)}</td>
+                                    ${data.show_comparative && comparative_closing_balance !== null ? `
+                                    <td class="text-right">${formatCurrency(comparative_closing_balance)}</td>
+                                    <td class="text-right">${formatCurrency(Math.abs(closing_balance - comparative_closing_balance))}${closing_balance - comparative_closing_balance !== 0 ? (closing_balance - comparative_closing_balance > 0 ? ' ↑' : ' ↓') : ''}</td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="net-cash-flow">
+                                    <td><strong>NET CASH FLOW</strong></td>
+                                    <td class="text-right ${netCashFlow >= 0 ? 'positive' : 'negative'}"><strong>${formatCurrency(netCashFlow)}</strong></td>
+                                    ${data.show_comparative && comparativeNetCashFlow !== null ? `
+                                    <td class="text-right ${comparativeNetCashFlow >= 0 ? 'positive' : 'negative'}"><strong>${formatCurrency(comparativeNetCashFlow)}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(netCashFlow - comparativeNetCashFlow))}${netCashFlow - comparativeNetCashFlow !== 0 ? (netCashFlow - comparativeNetCashFlow > 0 ? ' ↑' : ' ↓') : ''}</strong></td>
+                                    ` : ''}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="summary-box">
+                    <h3 style="margin: 0 0 15px 0;">CASH FLOW SUMMARY</h3>
+                    <div style="display: flex; justify-content: space-around;">
+                        <div>
+                            <div><strong>Opening Balance</strong></div>
+                            <div style="font-size: 16px;">${formatCurrency(opening_balance)}</div>
+                        </div>
+                        <div>
+                            <div><strong>Net Profit/Loss</strong></div>
+                            <div class="${net_profit >= 0 ? 'positive' : 'negative'}" style="font-size: 16px;">${formatCurrency(net_profit)}</div>
+                        </div>
+                        <div>
+                            <div><strong>Closing Balance</strong></div>
+                            <div style="font-size: 16px;">${formatCurrency(closing_balance)}</div>
+                        </div>
+                        <div>
+                            <div><strong>Net Cash Flow</strong></div>
+                            <div class="${netCashFlow >= 0 ? 'positive' : 'negative'}" style="font-size: 18px; font-weight: bold;">${formatCurrency(netCashFlow)}</div>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+
+        printWindow.document.close();
+        printWindow.print();
+    };
+
     // Generate CSV export
     const exportCSV = () => {
         let csvContent = "data:text/csv;charset=utf-8,";
@@ -122,36 +367,32 @@ export default function CashFlow({
         }
 
         // Opening Balance
-        csvContent += `Opening Balance,${opening_balance},`;
+        csvContent += `Opening Balance,${opening_balance}`;
         if (data.show_comparative && comparative_opening_balance !== null) {
-            csvContent += `${comparative_opening_balance},${opening_balance - comparative_opening_balance}\n`;
-        } else {
-            csvContent += '\n';
+            csvContent += `,${comparative_opening_balance},${opening_balance - comparative_opening_balance}`;
         }
+        csvContent += '\n';
 
         // Operating Activities
-        csvContent += `Net Profit,${net_profit},`;
+        csvContent += `Net Profit,${net_profit}`;
         if (data.show_comparative && comparative_net_profit !== null) {
-            csvContent += `${comparative_net_profit},${net_profit - comparative_net_profit}\n`;
-        } else {
-            csvContent += '\n';
+            csvContent += `,${comparative_net_profit},${net_profit - comparative_net_profit}`;
         }
+        csvContent += '\n';
 
         // Closing Balance
-        csvContent += `Closing Balance,${closing_balance},`;
+        csvContent += `Closing Balance,${closing_balance}`;
         if (data.show_comparative && comparative_closing_balance !== null) {
-            csvContent += `${comparative_closing_balance},${closing_balance - comparative_closing_balance}\n`;
-        } else {
-            csvContent += '\n';
+            csvContent += `,${comparative_closing_balance},${closing_balance - comparative_closing_balance}`;
         }
+        csvContent += '\n';
 
         // Net Cash Flow
-        csvContent += `Net Cash Flow,${netCashFlow},`;
+        csvContent += `Net Cash Flow,${netCashFlow}`;
         if (data.show_comparative && comparativeNetCashFlow !== null) {
-            csvContent += `${comparativeNetCashFlow},${netCashFlow - comparativeNetCashFlow}\n`;
-        } else {
-            csvContent += '\n';
+            csvContent += `,${comparativeNetCashFlow},${netCashFlow - comparativeNetCashFlow}`;
         }
+        csvContent += '\n';
 
         // Create download link
         const encodedUri = encodeURI(csvContent);
@@ -173,7 +414,7 @@ export default function CashFlow({
                 </h1>
                 <div className="mt-4 lg:mt-0 flex flex-wrap gap-2">
                     <button
-                        onClick={() => window.print()}
+                        onClick={handlePrint}
                         className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                         <Printer className="h-4 w-4 mr-2" />
@@ -197,7 +438,7 @@ export default function CashFlow({
             </div>
 
             {/* Filters Section */}
-            <div className="bg-white shadow rounded-lg mb-6 overflow-hidden">
+            <div className="bg-white shadow rounded-lg mb-6 overflow-hidden no-print">
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium text-gray-700 flex items-center">
@@ -228,7 +469,7 @@ export default function CashFlow({
                             >
                                 {financial_years.map((fy) => (
                                     <option key={fy.id} value={fy.id}>
-                                        {fy.name}
+                                        {formatDate(fy.start_date)} to {formatDate(fy.end_date)}
                                     </option>
                                 ))}
                             </select>
@@ -310,10 +551,11 @@ export default function CashFlow({
                         <button
                             type="button"
                             onClick={applyFilters}
-                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            disabled={processing}
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                         >
                             <Filter className="h-4 w-4 mr-2" />
-                            Apply Filters
+                            {processing ? 'Loading...' : 'Apply Filters'}
                         </button>
                     </div>
                 </div>
@@ -327,179 +569,324 @@ export default function CashFlow({
                         For the period: {formatDate(data.from_date)} to {formatDate(data.to_date)}
                     </p>
                     <p className="text-center text-gray-500">
-                        Financial Year: {financial_year.name}
+                        Financial Year: {formatDate(financial_year.start_date)} to {formatDate(financial_year.end_date)}
                     </p>
                     {data.show_comparative && comparative_financial_year && (
                         <p className="text-center text-gray-500">
-                            Comparative Period: {comparative_financial_year.name}
+                            Comparative Period: {formatDate(comparative_financial_year.start_date)} to {formatDate(comparative_financial_year.end_date)}
                         </p>
                     )}
                 </div>
 
-                {/* Cash Flow Table */}
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th
-                                    scope="col"
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                    Cash Flow Item
-                                </th>
-                                <th
-                                    scope="col"
-                                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                    Current Period
-                                </th>
-                                {data.show_comparative && (
-                                    <>
-                                        <th
-                                            scope="col"
-                                            className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                        >
-                                            {comparative_period_options[data.comparative_period]}
+                {/* Left-Right Cash Flow Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+                    {/* Left Column - Cash Inflows */}
+                    <div className="bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-green-50">
+                                    <tr>
+                                        <th colSpan={data.show_comparative ? 4 : 2} className="px-4 py-3 text-center text-sm font-bold text-green-700 uppercase">
+                                            CASH INFLOWS
                                         </th>
-                                        <th
-                                            scope="col"
-                                            className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                        >
-                                            Change
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Item
                                         </th>
-                                    </>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {/* Opening Balance */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    OPENING BALANCE
-                                </td>
-                            </tr>
-                            <tr>
-                                <td className="px-6 py-3 text-sm">
-                                    <div className="flex items-center">
-                                        <DollarSign className="h-4 w-4 mr-2 text-gray-500" />
-                                        Cash & Bank Opening Balance
-                                    </div>
-                                </td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(opening_balance)}</td>
-                                {data.show_comparative && comparative_opening_balance !== null && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_opening_balance)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(opening_balance - comparative_opening_balance)}
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                            Current Period
+                                        </th>
+                                        {data.show_comparative && (
+                                            <>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    {comparative_period_options[data.comparative_period]}
+                                                </th>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    Change
+                                                </th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {/* Opening Balance */}
+                                    <tr className="bg-gray-100">
+                                        <td colSpan={data.show_comparative ? 4 : 2} className="px-4 py-2 text-sm font-bold text-gray-700">
+                                            OPENING BALANCE
                                         </td>
-                                    </>
-                                )}
-                            </tr>
-
-                            {/* Operating Activities */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    OPERATING ACTIVITIES
-                                </td>
-                            </tr>
-                            <tr>
-                                <td className="px-6 py-3 text-sm">
-                                    <div className="flex items-center">
-                                        <TrendingUp className="h-4 w-4 mr-2 text-green-500" />
-                                        Net Profit
-                                    </div>
-                                </td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(net_profit)}</td>
-                                {data.show_comparative && comparative_net_profit !== null && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_net_profit)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(net_profit - comparative_net_profit)}
+                                    </tr>
+                                    <tr>
+                                        <td className="px-4 py-2 text-sm">
+                                            <div className="flex items-center">
+                                                <DollarSign className="h-4 w-4 mr-2 text-green-500" />
+                                                Cash & Bank Opening Balance
+                                            </div>
                                         </td>
-                                    </>
-                                )}
-                            </tr>
+                                        <td className="px-4 py-2 text-sm text-right">{formatCurrency(opening_balance)}</td>
+                                        {data.show_comparative && comparative_opening_balance !== null && (
+                                            <>
+                                                <td className="px-4 py-2 text-sm text-right">{formatCurrency(comparative_opening_balance)}</td>
+                                                <td className="px-4 py-2 text-sm text-right">
+                                                    <span className={(opening_balance - comparative_opening_balance) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {formatCurrency(Math.abs(opening_balance - comparative_opening_balance))}
+                                                        {opening_balance - comparative_opening_balance !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {opening_balance - comparative_opening_balance > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
 
-                            {/* Closing Balance */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    CLOSING BALANCE
-                                </td>
-                            </tr>
-                            <tr>
-                                <td className="px-6 py-3 text-sm">
-                                    <div className="flex items-center">
-                                        <DollarSign className="h-4 w-4 mr-2 text-gray-500" />
-                                        Cash & Bank Closing Balance
-                                    </div>
-                                </td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(closing_balance)}</td>
-                                {data.show_comparative && comparative_closing_balance !== null && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_closing_balance)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            {formatCurrency(closing_balance - comparative_closing_balance)}
+                                    {/* Operating Activities - Positive */}
+                                    <tr className="bg-gray-100">
+                                        <td colSpan={data.show_comparative ? 4 : 2} className="px-4 py-2 text-sm font-bold text-gray-700">
+                                            OPERATING ACTIVITIES
                                         </td>
-                                    </>
-                                )}
-                            </tr>
+                                    </tr>
+                                    {net_profit > 0 && (
+                                        <tr>
+                                            <td className="px-4 py-2 text-sm">
+                                                <div className="flex items-center">
+                                                    <TrendingUp className="h-4 w-4 mr-2 text-green-500" />
+                                                    Net Profit
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-right text-green-600">{formatCurrency(net_profit)}</td>
+                                            {data.show_comparative && comparative_net_profit !== null && (
+                                                <>
+                                                    <td className="px-4 py-2 text-sm text-right">
+                                                        <span className={comparative_net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                            {formatCurrency(Math.abs(comparative_net_profit))}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-right">
+                                                        <span className={(net_profit - comparative_net_profit) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                            {formatCurrency(Math.abs(net_profit - comparative_net_profit))}
+                                                            {net_profit - comparative_net_profit !== 0 && (
+                                                                <span className="ml-1 text-xs">
+                                                                    {net_profit - comparative_net_profit > 0 ? '↑' : '↓'}
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    </td>
+                                                </>
+                                            )}
+                                        </tr>
+                                    )}
 
-                            {/* Net Cash Flow */}
-                            <tr className="bg-blue-50 font-bold">
-                                <td className="px-6 py-3 text-sm">
-                                    <div className="flex items-center">
-                                        {netCashFlow >= 0 ?
-                                            <ArrowUpCircle className="h-4 w-4 mr-2 text-green-600" /> :
-                                            <ArrowDownCircle className="h-4 w-4 mr-2 text-red-600" />
-                                        }
-                                        NET CASH FLOW
-                                    </div>
-                                </td>
-                                <td className="px-6 py-3 text-sm text-right">
-                                    <span className={netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                        {formatCurrency(netCashFlow)}
-                                    </span>
-                                </td>
-                                {data.show_comparative && comparativeNetCashFlow !== null && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={comparativeNetCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                {formatCurrency(comparativeNetCashFlow)}
+                                    {/* Total Cash Inflows */}
+                                    <tr className="bg-green-50 font-semibold border-t-2 border-green-300">
+                                        <td className="px-4 py-3 text-sm">Total Cash Inflows</td>
+                                        <td className="px-4 py-3 text-sm text-right">{formatCurrency(opening_balance + Math.max(0, net_profit))}</td>
+                                        {data.show_comparative && comparative_opening_balance !== null && comparative_net_profit !== null && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">{formatCurrency(comparative_opening_balance + Math.max(0, comparative_net_profit))}</td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    {formatCurrency(Math.abs((opening_balance + Math.max(0, net_profit)) - (comparative_opening_balance + Math.max(0, comparative_net_profit))))}
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Right Column - Cash Outflows */}
+                    <div className="bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-red-50">
+                                    <tr>
+                                        <th colSpan={data.show_comparative ? 4 : 2} className="px-4 py-3 text-center text-sm font-bold text-red-700 uppercase">
+                                            CASH OUTFLOWS & CLOSING
+                                        </th>
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Item
+                                        </th>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                            Current Period
+                                        </th>
+                                        {data.show_comparative && (
+                                            <>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    {comparative_period_options[data.comparative_period]}
+                                                </th>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    Change
+                                                </th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {/* Operating Expenses */}
+                                    <tr className="bg-gray-100">
+                                        <td colSpan={data.show_comparative ? 4 : 2} className="px-4 py-2 text-sm font-bold text-gray-700">
+                                            OPERATING EXPENSES
+                                        </td>
+                                    </tr>
+                                    {net_profit < 0 && (
+                                        <tr>
+                                            <td className="px-4 py-2 text-sm">
+                                                <div className="flex items-center">
+                                                    <TrendingDown className="h-4 w-4 mr-2 text-red-500" />
+                                                    Net Loss
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2 text-sm text-right text-red-600">{formatCurrency(Math.abs(net_profit))}</td>
+                                            {data.show_comparative && comparative_net_profit !== null && (
+                                                <>
+                                                    <td className="px-4 py-2 text-sm text-right">
+                                                        <span className={comparative_net_profit <= 0 ? 'text-red-600' : 'text-green-600'}>
+                                                            {formatCurrency(Math.abs(Math.min(0, comparative_net_profit)))}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-2 text-sm text-right">
+                                                        {formatCurrency(Math.abs(Math.abs(net_profit) - Math.abs(Math.min(0, comparative_net_profit))))}
+                                                    </td>
+                                                </>
+                                            )}
+                                        </tr>
+                                    )}
+
+                                    {/* Total Cash Outflows */}
+                                    <tr className="bg-red-50 font-semibold border-t-2 border-red-300">
+                                        <td className="px-4 py-3 text-sm">Total Cash Outflows</td>
+                                        <td className="px-4 py-3 text-sm text-right">{formatCurrency(Math.abs(Math.min(0, net_profit)))}</td>
+                                        {data.show_comparative && comparative_net_profit !== null && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">{formatCurrency(Math.abs(Math.min(0, comparative_net_profit)))}</td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    {formatCurrency(Math.abs(Math.abs(Math.min(0, net_profit)) - Math.abs(Math.min(0, comparative_net_profit))))}
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+
+                                    {/* Closing Balance */}
+                                    <tr className="bg-gray-100">
+                                        <td colSpan={data.show_comparative ? 4 : 2} className="px-4 py-2 text-sm font-bold text-gray-700">
+                                            CLOSING BALANCE
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td className="px-4 py-2 text-sm">
+                                            <div className="flex items-center">
+                                                <DollarSign className="h-4 w-4 mr-2 text-blue-500" />
+                                                Cash & Bank Closing Balance
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2 text-sm text-right">{formatCurrency(closing_balance)}</td>
+                                        {data.show_comparative && comparative_closing_balance !== null && (
+                                            <>
+                                                <td className="px-4 py-2 text-sm text-right">{formatCurrency(comparative_closing_balance)}</td>
+                                                <td className="px-4 py-2 text-sm text-right">
+                                                    <span className={(closing_balance - comparative_closing_balance) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {formatCurrency(Math.abs(closing_balance - comparative_closing_balance))}
+                                                        {closing_balance - comparative_closing_balance !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {closing_balance - comparative_closing_balance > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+
+                                    {/* Net Cash Flow */}
+                                    <tr className="bg-blue-50 font-bold border-t-2 border-blue-300">
+                                        <td className="px-4 py-3 text-sm">
+                                            <div className="flex items-center">
+                                                {netCashFlow >= 0 ? (
+                                                    <ArrowUpCircle className="h-4 w-4 mr-2 text-green-600" />
+                                                ) : (
+                                                    <ArrowDownCircle className="h-4 w-4 mr-2 text-red-600" />
+                                                )}
+                                                NET CASH FLOW
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-right">
+                                            <span className={netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                {formatCurrency(netCashFlow)}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(netCashFlow - comparativeNetCashFlow) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                {formatCurrency(netCashFlow - comparativeNetCashFlow)}
-                                            </span>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-                        </tbody>
-                    </table>
+                                        {data.show_comparative && comparativeNetCashFlow !== null && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={comparativeNetCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {formatCurrency(comparativeNetCashFlow)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={(netCashFlow - comparativeNetCashFlow) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {formatCurrency(Math.abs(netCashFlow - comparativeNetCashFlow))}
+                                                        {netCashFlow - comparativeNetCashFlow !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {netCashFlow - comparativeNetCashFlow > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Cash Flow Summary */}
+                <div className="px-6 py-4 bg-gray-50 border-t">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                            <div className="text-sm text-gray-600">Opening Balance</div>
+                            <div className="text-lg font-semibold text-blue-600">
+                                {formatCurrency(opening_balance)}
+                            </div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-sm text-gray-600">Net Profit/Loss</div>
+                            <div className={`text-lg font-semibold ${net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(net_profit)}
+                            </div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-sm text-gray-600">Closing Balance</div>
+                            <div className="text-lg font-semibold text-blue-600">
+                                {formatCurrency(closing_balance)}
+                            </div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-sm text-gray-600">Net Cash Flow</div>
+                            <div className={`text-lg font-semibold ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(netCashFlow)}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {/* Print Styles */}
             <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          .print-container, .print-container * {
-            visibility: visible;
-          }
-          .print-container {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-          button, .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
+                @media print {
+                    .no-print {
+                        display: none !important;
+                    }
+                    body {
+                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact;
+                    }
+                }
+            `}</style>
         </AppLayout>
     );
 }

@@ -178,8 +178,8 @@ export default function ProfitAndLoss({
         return undefined;
     };
 
-    // Recursive function to render account groups
-    const renderAccountGroup = (group: AccountGroup, depth = 0, comparativeGroups: AccountGroup[] | null = null) => {
+    // Recursive function to render account groups for left-right layout
+    const renderAccountGroupLeftRight = (group: AccountGroup, depth = 0, comparativeGroups: AccountGroup[] | null = null) => {
         const isExpanded = expandedGroups[group.id] || false;
         const hasChildren = group.children && group.children.length > 0;
         const hasLedgerAccounts = group.ledger_accounts && group.ledger_accounts.length > 0;
@@ -188,138 +188,375 @@ export default function ProfitAndLoss({
         const comparativeGroup = findComparativeGroup(comparativeGroups, group.id);
         const change = comparativeGroup ? group.balance - comparativeGroup.balance : 0;
 
-        return (
-            <React.Fragment key={group.id}>
-                {/* Group Header Row */}
-                <tr className={`hover:bg-gray-50 ${depth === 0 ? 'font-semibold' : ''} ${depth > 0 ? 'text-sm' : ''}`}>
-                    <td
-                        className="px-6 py-2"
-                        style={{ paddingLeft: depth > 0 ? `${1.5 + (depth * 1)}rem` : '1.5rem' }}
-                    >
-                        <div className="flex items-center cursor-pointer"
-                             onClick={() => (hasChildren || hasLedgerAccounts) && toggleGroup(group.id)}>
-                            {(hasChildren || hasLedgerAccounts) && (
-                                <button
-                                    type="button"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleGroup(group.id);
-                                    }}
-                                    className="mr-2 focus:outline-none"
-                                >
-                                    {isExpanded ?
-                                        <ChevronDown className="h-4 w-4 text-gray-500" /> :
-                                        <ChevronRight className="h-4 w-4 text-gray-500" />
-                                    }
-                                </button>
-                            )}
-                            <span>{group.name}</span>
-                            {group.code && (
-                                <span className="ml-2 text-gray-500 text-xs">({group.code})</span>
-                            )}
-                        </div>
-                    </td>
-                    <td className="px-6 py-2 text-right">
-                        {/* Show balance only if collapsed or leaf node */}
-                        {(!hasChildren && !hasLedgerAccounts) || !isExpanded ? formatCurrency(group.balance) : ''}
-                    </td>
-                    {data.show_comparative && (
-                        <>
-                            <td className="px-6 py-2 text-right">
-                                {((!hasChildren && !hasLedgerAccounts) || !isExpanded) && comparativeGroup ?
-                                    formatCurrency(comparativeGroup.balance) : ''}
-                            </td>
-                            <td className="px-6 py-2 text-right">
-                                {((!hasChildren && !hasLedgerAccounts) || !isExpanded) && (
-                                    <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
-                                        {formatCurrency(Math.abs(change))}
-                                        {change !== 0 && (
-                                            <span className="ml-1 text-xs">
-                                                {change > 0 ? '↑' : '↓'}
-                                            </span>
-                                        )}
-                                    </span>
-                                )}
-                            </td>
-                        </>
-                    )}
-                </tr>
+        const content = [];
 
-                {/* Render ledger accounts if expanded */}
-                {isExpanded && hasLedgerAccounts && group.ledger_accounts.map(account => {
-                    const comparativeLedgerAccount = comparativeGroup?.ledger_accounts?.find(ca => ca.id === account.id);
-                    const accountChange = comparativeLedgerAccount ? account.balance - comparativeLedgerAccount.balance : 0;
-
-                    return (
-                        <tr key={`ledger-${account.id}`} className="text-sm text-gray-600">
-                            <td className="px-6 py-1" style={{ paddingLeft: `${2 + (depth * 1)}rem` }}>
-                                <div className="flex items-center">
-                                    <span className="mr-2 text-gray-400">├─</span>
-                                    <span>{account.name}</span>
-                                    {account.code && (
-                                        <span className="ml-2 text-gray-400 text-xs">({account.code})</span>
-                                    )}
-                                </div>
-                            </td>
-                            <td className="px-6 py-1 text-right">
-                                {formatCurrency(account.balance)}
-                            </td>
-                            {data.show_comparative && (
-                                <>
-                                    <td className="px-6 py-1 text-right">
-                                        {comparativeLedgerAccount ? formatCurrency(comparativeLedgerAccount.balance) : formatCurrency(0)}
-                                    </td>
-                                    <td className="px-6 py-1 text-right">
-                                        <span className={accountChange > 0 ? 'text-green-600' : accountChange < 0 ? 'text-red-600' : ''}>
-                                            {formatCurrency(Math.abs(accountChange))}
-                                            {accountChange !== 0 && (
-                                                <span className="ml-1 text-xs">
-                                                    {accountChange > 0 ? '↑' : '↓'}
-                                                </span>
-                                            )}
-                                        </span>
-                                    </td>
-                                </>
+        // Group Header Row
+        content.push(
+            <tr key={group.id} className={`hover:bg-gray-50 ${depth === 0 ? 'font-semibold' : ''} ${depth > 0 ? 'text-sm' : ''}`}>
+                <td className="px-4 py-2" style={{ paddingLeft: depth > 0 ? `${1 + (depth * 1)}rem` : '1rem' }}>
+                    <div className="flex items-center cursor-pointer" onClick={() => (hasChildren || hasLedgerAccounts) && toggleGroup(group.id)}>
+                        {(hasChildren || hasLedgerAccounts) && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); toggleGroup(group.id); }} className="mr-2 focus:outline-none">
+                                {isExpanded ? <ChevronDown className="h-4 w-4 text-gray-500" /> : <ChevronRight className="h-4 w-4 text-gray-500" />}
+                            </button>
+                        )}
+                        <span>{group.name}</span>
+                        {group.code && <span className="ml-2 text-gray-500 text-xs">({group.code})</span>}
+                    </div>
+                </td>
+                <td className="px-4 py-2 text-right">
+                    {(!hasChildren && !hasLedgerAccounts) || !isExpanded ? formatCurrency(group.balance) : ''}
+                </td>
+                {data.show_comparative && (
+                    <>
+                        <td className="px-4 py-2 text-right">
+                            {((!hasChildren && !hasLedgerAccounts) || !isExpanded) && comparativeGroup ? formatCurrency(comparativeGroup.balance) : ''}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                            {((!hasChildren && !hasLedgerAccounts) || !isExpanded) && (
+                                <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
+                                    {formatCurrency(Math.abs(change))}
+                                    {change !== 0 && <span className="ml-1 text-xs">{change > 0 ? '↑' : '↓'}</span>}
+                                </span>
                             )}
-                        </tr>
-                    );
-                })}
-
-                {/* Render children if expanded */}
-                {isExpanded && hasChildren && group.children.map(child =>
-                    renderAccountGroup(child, depth + 1, comparativeGroup?.children)
+                        </td>
+                    </>
                 )}
+            </tr>
+        );
 
-                {/* Show subtotal for expanded groups */}
-                {isExpanded && (hasChildren || hasLedgerAccounts) && (
-                    <tr className="bg-gray-50 text-sm font-medium border-t">
-                        <td className="px-6 py-2" style={{ paddingLeft: `${1.5 + (depth * 1)}rem` }}>
-                            <span className="text-gray-700">Total {group.name}</span>
+        // Render children if expanded
+        if (isExpanded && hasChildren) {
+            group.children.forEach(child => {
+                content.push(...renderAccountGroupLeftRight(child, depth + 1, comparativeGroup?.children));
+            });
+        }
+
+        // Render ledger accounts if expanded
+        if (isExpanded && hasLedgerAccounts) {
+            group.ledger_accounts.forEach(account => {
+                const comparativeLedgerAccount = comparativeGroup?.ledger_accounts?.find(ca => ca.id === account.id);
+                const accountChange = comparativeLedgerAccount ? account.balance - comparativeLedgerAccount.balance : 0;
+
+                content.push(
+                    <tr key={`ledger-${account.id}`} className="text-sm text-gray-600">
+                        <td className="px-4 py-1" style={{ paddingLeft: `${1.5 + (depth * 1)}rem` }}>
+                            <div className="flex items-center">
+                                <span className="mr-2 text-gray-400">├─</span>
+                                <span>{account.name}</span>
+                                {account.code && <span className="ml-2 text-gray-400 text-xs">({account.code})</span>}
+                            </div>
                         </td>
-                        <td className="px-6 py-2 text-right">
-                            {formatCurrency(group.balance)}
-                        </td>
+                        <td className="px-4 py-1 text-right">{formatCurrency(account.balance)}</td>
                         {data.show_comparative && (
                             <>
-                                <td className="px-6 py-2 text-right">
-                                    {comparativeGroup ? formatCurrency(comparativeGroup.balance) : formatCurrency(0)}
+                                <td className="px-4 py-1 text-right">
+                                    {comparativeLedgerAccount ? formatCurrency(comparativeLedgerAccount.balance) : formatCurrency(0)}
                                 </td>
-                                <td className="px-6 py-2 text-right">
-                                    <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
-                                        {formatCurrency(Math.abs(change))}
-                                        {change !== 0 && (
-                                            <span className="ml-1 text-xs">
-                                                {change > 0 ? '↑' : '↓'}
-                                            </span>
-                                        )}
+                                <td className="px-4 py-1 text-right">
+                                    <span className={accountChange > 0 ? 'text-green-600' : accountChange < 0 ? 'text-red-600' : ''}>
+                                        {formatCurrency(Math.abs(accountChange))}
+                                        {accountChange !== 0 && <span className="ml-1 text-xs">{accountChange > 0 ? '↑' : '↓'}</span>}
                                     </span>
                                 </td>
                             </>
                         )}
                     </tr>
-                )}
-            </React.Fragment>
-        );
+                );
+            });
+        }
+
+        // Show subtotal for expanded groups
+        if (isExpanded && (hasChildren || hasLedgerAccounts)) {
+            content.push(
+                <tr key={`subtotal-${group.id}`} className="bg-gray-50 text-sm font-medium border-t">
+                    <td className="px-4 py-2" style={{ paddingLeft: `${1 + (depth * 1)}rem` }}>
+                        <span className="text-gray-700">Total {group.name}</span>
+                    </td>
+                    <td className="px-4 py-2 text-right">{formatCurrency(group.balance)}</td>
+                    {data.show_comparative && (
+                        <>
+                            <td className="px-4 py-2 text-right">
+                                {comparativeGroup ? formatCurrency(comparativeGroup.balance) : formatCurrency(0)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                                <span className={change > 0 ? 'text-green-600' : change < 0 ? 'text-red-600' : ''}>
+                                    {formatCurrency(Math.abs(change))}
+                                    {change !== 0 && <span className="ml-1 text-xs">{change > 0 ? '↑' : '↓'}</span>}
+                                </span>
+                            </td>
+                        </>
+                    )}
+                </tr>
+            );
+        }
+
+        return content;
+    };
+
+    // Handle print with left-right layout
+    const handlePrint = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Profit and Loss Statement</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 20px;
+                        color: #000;
+                        font-size: 12px;
+                    }
+                    .report-header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 15px;
+                    }
+                    .report-header h1 {
+                        font-size: 22px;
+                        margin: 0 0 10px 0;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                    }
+                    .report-header .subtitle {
+                        font-size: 14px;
+                        margin: 5px 0;
+                        color: #555;
+                    }
+                    .profit-loss-container {
+                        display: flex;
+                        justify-content: space-between;
+                        gap: 20px;
+                    }
+                    .left-column, .right-column {
+                        flex: 1;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 20px;
+                    }
+                    th, td {
+                        border: 1px solid #000;
+                        padding: 6px 8px;
+                        text-align: left;
+                        vertical-align: top;
+                    }
+                    th {
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        font-size: 11px;
+                    }
+                    .text-right {
+                        text-align: right;
+                    }
+                    .section-header {
+                        background-color: #e9ecef;
+                        font-weight: bold;
+                        font-size: 13px;
+                    }
+                    .total-row {
+                        background-color: #f8f9fa;
+                        font-weight: bold;
+                        border-top: 2px solid #000;
+                    }
+                    .gross-profit-row {
+                        background-color: #e3f2fd;
+                        font-weight: bold;
+                        border: 2px solid #000;
+                    }
+                    .net-profit-row {
+                        background-color: #e8f5e8;
+                        font-weight: bold;
+                        border: 3px double #000;
+                    }
+                    .positive { color: #28a745; }
+                    .negative { color: #dc3545; }
+                    .summary-box {
+                        margin-top: 20px;
+                        border: 2px solid #000;
+                        padding: 15px;
+                        background-color: #f9f9f9;
+                        text-align: center;
+                    }
+                    @page {
+                        margin: 0.75in;
+                        size: A4;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="report-header">
+                    <h1>Profit and Loss Statement</h1>
+                    <div class="subtitle">For the period: ${formatDate(data.from_date)} to ${formatDate(data.to_date)}</div>
+                    <div class="subtitle">Financial Year: ${formatDate(financial_year.start_date)} to ${formatDate(financial_year.end_date)}</div>
+                    ${data.show_comparative && comparative_financial_year ? `<div class="subtitle">Comparative Period: ${formatDate(comparative_financial_year.start_date)} to ${formatDate(comparative_financial_year.end_date)}</div>` : ''}
+                </div>
+
+                <div class="profit-loss-container">
+                    <div class="left-column">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th colspan="${data.show_comparative ? 4 : 2}" class="section-header">INCOME</th>
+                                </tr>
+                                <tr>
+                                    <th style="width: 60%;">Account</th>
+                                    <th style="width: ${data.show_comparative ? '15%' : '40%'};" class="text-right">Current Period</th>
+                                    ${data.show_comparative ? `
+                                    <th style="width: 15%;" class="text-right">${comparative_period_options[data.comparative_period]}</th>
+                                    <th style="width: 10%;" class="text-right">Change</th>
+                                    ` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+        `);
+
+        // Add Income groups
+        income_groups.forEach(group => {
+            const comparativeGroup = findComparativeGroup(comparative_income_groups, group.id);
+            const change = comparativeGroup ? group.balance - comparativeGroup.balance : 0;
+
+            printWindow.document.write(`
+                <tr>
+                    <td style="padding-left: 1rem;">${group.name}${group.code ? ` (${group.code})` : ''}</td>
+                    <td class="text-right">${formatCurrency(group.balance)}</td>
+                    ${data.show_comparative ? `
+                    <td class="text-right">${comparativeGroup ? formatCurrency(comparativeGroup.balance) : formatCurrency(0)}</td>
+                    <td class="text-right">${formatCurrency(Math.abs(change))}${change !== 0 ? (change > 0 ? ' ↑' : ' ↓') : ''}</td>
+                    ` : ''}
+                </tr>
+            `);
+        });
+
+        printWindow.document.write(`
+                                <tr class="total-row">
+                                    <td><strong>Total Income</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(income_totals.total)}</strong></td>
+                                    ${data.show_comparative && comparative_income_totals ? `
+                                    <td class="text-right"><strong>${formatCurrency(comparative_income_totals.total)}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(income_totals.total - comparative_income_totals.total))}${(income_totals.total - comparative_income_totals.total) !== 0 ? ((income_totals.total - comparative_income_totals.total) > 0 ? ' ↑' : ' ↓') : ''}</strong></td>
+                                    ` : ''}
+                                </tr>
+        `);
+
+        // Gross Profit Section (if enabled)
+        if (data.show_gross_profit) {
+            printWindow.document.write(`
+                                <tr class="section-header">
+                                    <td colspan="${data.show_comparative ? 4 : 2}">DIRECT EXPENSES</td>
+                                </tr>
+                                <tr class="total-row">
+                                    <td><strong>Total Direct Expenses</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(direct_expense)}</strong></td>
+                                    ${data.show_comparative && comparative_direct_expense !== null ? `
+                                    <td class="text-right"><strong>${formatCurrency(comparative_direct_expense)}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(direct_expense - comparative_direct_expense))}${(direct_expense - comparative_direct_expense) !== 0 ? ((direct_expense - comparative_direct_expense) > 0 ? ' ↑' : ' ↓') : ''}</strong></td>
+                                    ` : ''}
+                                </tr>
+                                <tr class="gross-profit-row">
+                                    <td><strong>GROSS PROFIT</strong></td>
+                                    <td class="text-right ${gross_profit >= 0 ? 'positive' : 'negative'}"><strong>${formatCurrency(gross_profit)}</strong></td>
+                                    ${data.show_comparative && comparative_gross_profit !== null ? `
+                                    <td class="text-right ${comparative_gross_profit >= 0 ? 'positive' : 'negative'}"><strong>${formatCurrency(comparative_gross_profit)}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(gross_profit - comparative_gross_profit))}${(gross_profit - comparative_gross_profit) !== 0 ? ((gross_profit - comparative_gross_profit) > 0 ? ' ↑' : ' ↓') : ''}</strong></td>
+                                    ` : ''}
+                                </tr>
+            `);
+        }
+
+        printWindow.document.write(`
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="right-column">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th colspan="${data.show_comparative ? 4 : 2}" class="section-header">${data.show_gross_profit ? 'OPERATING EXPENSES' : 'EXPENSES'}</th>
+                                </tr>
+                                <tr>
+                                    <th style="width: 60%;">Account</th>
+                                    <th style="width: ${data.show_comparative ? '15%' : '40%'};" class="text-right">Current Period</th>
+                                    ${data.show_comparative ? `
+                                    <th style="width: 15%;" class="text-right">${comparative_period_options[data.comparative_period]}</th>
+                                    <th style="width: 10%;" class="text-right">Change</th>
+                                    ` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+        `);
+
+        // Add Expense groups
+        expense_groups.forEach(group => {
+            const comparativeGroup = findComparativeGroup(comparative_expense_groups, group.id);
+            const change = comparativeGroup ? group.balance - comparativeGroup.balance : 0;
+
+            printWindow.document.write(`
+                <tr>
+                    <td style="padding-left: 1rem;">${group.name}${group.code ? ` (${group.code})` : ''}</td>
+                    <td class="text-right">${formatCurrency(group.balance)}</td>
+                    ${data.show_comparative ? `
+                    <td class="text-right">${comparativeGroup ? formatCurrency(comparativeGroup.balance) : formatCurrency(0)}</td>
+                    <td class="text-right">${formatCurrency(Math.abs(change))}${change !== 0 ? (change > 0 ? ' ↑' : ' ↓') : ''}</td>
+                    ` : ''}
+                </tr>
+            `);
+        });
+
+        printWindow.document.write(`
+                                <tr class="total-row">
+                                    <td><strong>Total ${data.show_gross_profit ? 'Operating ' : ''}Expenses</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(expense_totals.total)}</strong></td>
+                                    ${data.show_comparative && comparative_expense_totals ? `
+                                    <td class="text-right"><strong>${formatCurrency(comparative_expense_totals.total)}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(expense_totals.total - comparative_expense_totals.total))}${(expense_totals.total - comparative_expense_totals.total) !== 0 ? ((expense_totals.total - comparative_expense_totals.total) > 0 ? ' ↑' : ' ↓') : ''}</strong></td>
+                                    ` : ''}
+                                </tr>
+
+                                <tr class="net-profit-row">
+                                    <td><strong>NET PROFIT</strong></td>
+                                    <td class="text-right ${net_profit >= 0 ? 'positive' : 'negative'}"><strong>${formatCurrency(net_profit)}</strong></td>
+                                    ${data.show_comparative && comparative_net_profit !== null ? `
+                                    <td class="text-right ${comparative_net_profit >= 0 ? 'positive' : 'negative'}"><strong>${formatCurrency(comparative_net_profit)}</strong></td>
+                                    <td class="text-right"><strong>${formatCurrency(Math.abs(net_profit - comparative_net_profit))}${(net_profit - comparative_net_profit) !== 0 ? ((net_profit - comparative_net_profit) > 0 ? ' ↑' : ' ↓') : ''}</strong></td>
+                                    ` : ''}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="summary-box">
+                    <h3 style="margin: 0 0 15px 0;">PROFIT SUMMARY</h3>
+                    <div style="display: flex; justify-content: space-around;">
+                        <div>
+                            <div><strong>Total Income</strong></div>
+                            <div class="positive" style="font-size: 16px;">${formatCurrency(income_totals.total)}</div>
+                        </div>
+                        <div>
+                            <div><strong>Total Expenses</strong></div>
+                            <div class="negative" style="font-size: 16px;">${formatCurrency(expense_totals.total)}</div>
+                        </div>
+                        <div>
+                            <div><strong>Net Profit</strong></div>
+                            <div class="${net_profit >= 0 ? 'positive' : 'negative'}" style="font-size: 18px; font-weight: bold;">${formatCurrency(net_profit)}</div>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+
+        printWindow.document.close();
+        printWindow.print();
     };
 
     // Generate CSV export
@@ -427,7 +664,7 @@ export default function ProfitAndLoss({
                 </h1>
                 <div className="mt-4 lg:mt-0 flex flex-wrap gap-2">
                     <button
-                        onClick={() => window.print()}
+                        onClick={handlePrint}
                         className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                         <Printer className="h-4 w-4 mr-2" />
@@ -451,7 +688,7 @@ export default function ProfitAndLoss({
             </div>
 
             {/* Filters Section */}
-            <div className="bg-white shadow rounded-lg mb-6 overflow-hidden">
+            <div className="bg-white shadow rounded-lg mb-6 overflow-hidden no-print">
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
                     <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium text-gray-700 flex items-center">
@@ -482,7 +719,7 @@ export default function ProfitAndLoss({
                             >
                                 {financial_years.map((fy) => (
                                     <option key={fy.id} value={fy.id}>
-                                        {fy.name}
+                                        {formatDate(fy.start_date)} to {formatDate(fy.end_date)}
                                     </option>
                                 ))}
                             </select>
@@ -602,107 +839,66 @@ export default function ProfitAndLoss({
             <div className="bg-white shadow rounded-lg mb-6 overflow-hidden print-container">
                 <div className="px-6 py-5">
                     <h2 className="text-xl font-bold text-center text-gray-900">Profit and Loss Statement</h2>
-                    <p className="text-center text-gray-500">
+                    {/* <p className="text-center text-gray-500">
                         For the period: {formatDate(data.from_date)} to {formatDate(data.to_date)}
-                    </p>
+                    </p> */}
                     <p className="text-center text-gray-500">
-                        Financial Year: {financial_year.name}
+                        Financial Year: {formatDate(financial_year.start_date)} to {formatDate(financial_year.end_date)}
                     </p>
                     {data.show_comparative && comparative_financial_year && (
                         <p className="text-center text-gray-500">
-                            Comparative Period: {comparative_financial_year.name}
+                            Comparative Period: {formatDate(comparative_financial_year.start_date)} to {formatDate(comparative_financial_year.end_date)}
                         </p>
                     )}
                 </div>
 
-                {/* Profit & Loss Table */}
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th
-                                    scope="col"
-                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                    Account
-                                </th>
-                                <th
-                                    scope="col"
-                                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                >
-                                    Current Period
-                                </th>
-                                {data.show_comparative && (
-                                    <>
-                                        <th
-                                            scope="col"
-                                            className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                        >
-                                            {comparative_period_options[data.comparative_period]}
+                {/* Left-Right P&L Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+                    {/* Left Column - Income */}
+                    <div className="bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th colSpan={data.show_comparative ? 4 : 2} className="px-4 py-3 text-center text-sm font-bold text-gray-700 uppercase">
+                                            INCOME
                                         </th>
-                                        <th
-                                            scope="col"
-                                            className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                        >
-                                            Change
-                                        </th>
-                                    </>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {/* INCOME SECTION */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    INCOME
-                                </td>
-                            </tr>
-
-                            {income_groups.map(group => renderAccountGroup(group, 0, comparative_income_groups))}
-
-                            {/* Income Totals */}
-                            <tr className="bg-gray-50 font-semibold">
-                                <td className="px-6 py-3 text-sm">Total Income</td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(income_totals.total)}</td>
-                                {data.show_comparative && comparative_income_totals && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_income_totals.total)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(income_totals.total - comparative_income_totals.total) > 0 ? 'text-green-600' : (income_totals.total - comparative_income_totals.total) < 0 ? 'text-red-600' : ''}>
-                                                {formatCurrency(Math.abs(income_totals.total - comparative_income_totals.total))}
-                                                {(income_totals.total - comparative_income_totals.total) !== 0 && (
-                                                    <span className="ml-1 text-xs">
-                                                        {(income_totals.total - comparative_income_totals.total) > 0 ? '↑' : '↓'}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-
-                            {/* GROSS PROFIT SECTION (if enabled) */}
-                            {data.show_gross_profit && (
-                                <>
-                                    <tr className="bg-gray-100">
-                                        <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                            DIRECT EXPENSES
-                                        </td>
                                     </tr>
-
-                                    {/* Direct Expenses Totals */}
-                                    <tr className="bg-gray-50 font-semibold">
-                                        <td className="px-6 py-3 text-sm">Total Direct Expenses</td>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(direct_expense)}</td>
-                                        {data.show_comparative && comparative_direct_expense !== null && (
+                                    <tr className="bg-gray-50">
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Account
+                                        </th>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                            Current Period
+                                        </th>
+                                        {data.show_comparative && (
                                             <>
-                                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_direct_expense)}</td>
-                                                <td className="px-6 py-3 text-sm text-right">
-                                                    <span className={(direct_expense - comparative_direct_expense) > 0 ? 'text-red-600' : (direct_expense - comparative_direct_expense) < 0 ? 'text-green-600' : ''}>
-                                                        {formatCurrency(Math.abs(direct_expense - comparative_direct_expense))}
-                                                        {(direct_expense - comparative_direct_expense) !== 0 && (
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    {comparative_period_options[data.comparative_period]}
+                                                </th>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    Change
+                                                </th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {income_groups.map(group => renderAccountGroupLeftRight(group, 0, comparative_income_groups))}
+
+                                    {/* Income Totals */}
+                                    <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                        <td className="px-4 py-3 text-sm">Total Income</td>
+                                        <td className="px-4 py-3 text-sm text-right">{formatCurrency(income_totals.total)}</td>
+                                        {data.show_comparative && comparative_income_totals && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">{formatCurrency(comparative_income_totals.total)}</td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={(income_totals.total - comparative_income_totals.total) > 0 ? 'text-green-600' : (income_totals.total - comparative_income_totals.total) < 0 ? 'text-red-600' : ''}>
+                                                        {formatCurrency(Math.abs(income_totals.total - comparative_income_totals.total))}
+                                                        {(income_totals.total - comparative_income_totals.total) !== 0 && (
                                                             <span className="ml-1 text-xs">
-                                                                {(direct_expense - comparative_direct_expense) > 0 ? '↑' : '↓'}
+                                                                {(income_totals.total - comparative_income_totals.total) > 0 ? '↑' : '↓'}
                                                             </span>
                                                         )}
                                                     </span>
@@ -711,27 +907,116 @@ export default function ProfitAndLoss({
                                         )}
                                     </tr>
 
-                                    {/* Gross Profit */}
-                                    <tr className="bg-blue-50 font-bold">
-                                        <td className="px-6 py-3 text-sm">GROSS PROFIT</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                {formatCurrency(gross_profit)}
-                                            </span>
-                                        </td>
-                                        {data.show_comparative && comparative_gross_profit !== null && (
-                                            <>
-                                                <td className="px-6 py-3 text-sm text-right">
-                                                    <span className={comparative_gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                        {formatCurrency(comparative_gross_profit)}
+                                    {/* GROSS PROFIT SECTION (if enabled) */}
+                                    {data.show_gross_profit && (
+                                        <>
+                                            <tr className="bg-gray-100">
+                                                <td colSpan={data.show_comparative ? 4 : 2} className="px-4 py-2 text-sm font-bold text-gray-700">
+                                                    DIRECT EXPENSES
+                                                </td>
+                                            </tr>
+
+                                            {/* Direct Expenses Totals */}
+                                            <tr className="bg-gray-50 font-semibold">
+                                                <td className="px-4 py-2 text-sm">Total Direct Expenses</td>
+                                                <td className="px-4 py-2 text-sm text-right">{formatCurrency(direct_expense)}</td>
+                                                {data.show_comparative && comparative_direct_expense !== null && (
+                                                    <>
+                                                        <td className="px-4 py-2 text-sm text-right">{formatCurrency(comparative_direct_expense)}</td>
+                                                        <td className="px-4 py-2 text-sm text-right">
+                                                            <span className={(direct_expense - comparative_direct_expense) > 0 ? 'text-red-600' : (direct_expense - comparative_direct_expense) < 0 ? 'text-green-600' : ''}>
+                                                                {formatCurrency(Math.abs(direct_expense - comparative_direct_expense))}
+                                                                {(direct_expense - comparative_direct_expense) !== 0 && (
+                                                                    <span className="ml-1 text-xs">
+                                                                        {(direct_expense - comparative_direct_expense) > 0 ? '↑' : '↓'}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+
+                                            {/* Gross Profit */}
+                                            <tr className="bg-blue-50 font-bold border-t-2 border-gray-300">
+                                                <td className="px-4 py-3 text-sm">GROSS PROFIT</td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {formatCurrency(gross_profit)}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-3 text-sm text-right">
-                                                    <span className={(gross_profit - comparative_gross_profit) > 0 ? 'text-green-600' : (gross_profit - comparative_gross_profit) < 0 ? 'text-red-600' : ''}>
-                                                        {formatCurrency(Math.abs(gross_profit - comparative_gross_profit))}
-                                                        {(gross_profit - comparative_gross_profit) !== 0 && (
+                                                {data.show_comparative && comparative_gross_profit !== null && (
+                                                    <>
+                                                        <td className="px-4 py-3 text-sm text-right">
+                                                            <span className={comparative_gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                {formatCurrency(comparative_gross_profit)}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right">
+                                                            <span className={(gross_profit - comparative_gross_profit) > 0 ? 'text-green-600' : (gross_profit - comparative_gross_profit) < 0 ? 'text-red-600' : ''}>
+                                                                {formatCurrency(Math.abs(gross_profit - comparative_gross_profit))}
+                                                                {(gross_profit - comparative_gross_profit) !== 0 && (
+                                                                    <span className="ml-1 text-xs">
+                                                                        {(gross_profit - comparative_gross_profit) > 0 ? '↑' : '↓'}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                        </td>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        </>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Right Column - Expenses */}
+                    <div className="bg-white">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-100">
+                                    <tr>
+                                        <th colSpan={data.show_comparative ? 4 : 2} className="px-4 py-3 text-center text-sm font-bold text-gray-700 uppercase">
+                                            {data.show_gross_profit ? 'OPERATING EXPENSES' : 'EXPENSES'}
+                                        </th>
+                                    </tr>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Account
+                                        </th>
+                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                            Current Period
+                                        </th>
+                                        {data.show_comparative && (
+                                            <>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    {comparative_period_options[data.comparative_period]}
+                                                </th>
+                                                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                                                    Change
+                                                </th>
+                                            </>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {expense_groups.map(group => renderAccountGroupLeftRight(group, 0, comparative_expense_groups))}
+
+                                    {/* Expense Totals */}
+                                    <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                        <td className="px-4 py-3 text-sm">Total {data.show_gross_profit ? 'Operating ' : ''}Expenses</td>
+                                        <td className="px-4 py-3 text-sm text-right">{formatCurrency(expense_totals.total)}</td>
+                                        {data.show_comparative && comparative_expense_totals && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">{formatCurrency(comparative_expense_totals.total)}</td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={(expense_totals.total - comparative_expense_totals.total) > 0 ? 'text-red-600' : (expense_totals.total - comparative_expense_totals.total) < 0 ? 'text-green-600' : ''}>
+                                                        {formatCurrency(Math.abs(expense_totals.total - comparative_expense_totals.total))}
+                                                        {(expense_totals.total - comparative_expense_totals.total) !== 0 && (
                                                             <span className="ml-1 text-xs">
-                                                                {(gross_profit - comparative_gross_profit) > 0 ? '↑' : '↓'}
+                                                                {(expense_totals.total - comparative_expense_totals.total) > 0 ? '↑' : '↓'}
                                                             </span>
                                                         )}
                                                     </span>
@@ -739,69 +1024,39 @@ export default function ProfitAndLoss({
                                             </>
                                         )}
                                     </tr>
-                                </>
-                            )}
 
-                            {/* EXPENSE SECTION */}
-                            <tr className="bg-gray-100">
-                                <td colSpan={data.show_comparative ? 4 : 2} className="px-6 py-3 text-sm font-bold text-gray-700">
-                                    {data.show_gross_profit ? 'OPERATING EXPENSES' : 'EXPENSES'}
-                                </td>
-                            </tr>
-
-                            {expense_groups.map(group => renderAccountGroup(group, 0, comparative_expense_groups))}
-
-                            {/* Expense Totals */}
-                            <tr className="bg-gray-50 font-semibold">
-                                <td className="px-6 py-3 text-sm">Total {data.show_gross_profit ? 'Operating ' : ''}Expenses</td>
-                                <td className="px-6 py-3 text-sm text-right">{formatCurrency(expense_totals.total)}</td>
-                                {data.show_comparative && comparative_expense_totals && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">{formatCurrency(comparative_expense_totals.total)}</td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(expense_totals.total - comparative_expense_totals.total) > 0 ? 'text-red-600' : (expense_totals.total - comparative_expense_totals.total) < 0 ? 'text-green-600' : ''}>
-                                                {formatCurrency(Math.abs(expense_totals.total - comparative_expense_totals.total))}
-                                                {(expense_totals.total - comparative_expense_totals.total) !== 0 && (
-                                                    <span className="ml-1 text-xs">
-                                                        {(expense_totals.total - comparative_expense_totals.total) > 0 ? '↑' : '↓'}
+                                    {/* NET PROFIT */}
+                                    <tr className="bg-green-50 font-bold border-t-2 border-gray-300">
+                                        <td className="px-4 py-3 text-sm">NET PROFIT</td>
+                                        <td className="px-4 py-3 text-sm text-right">
+                                            <span className={net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                {formatCurrency(net_profit)}
+                                            </span>
+                                        </td>
+                                        {data.show_comparative && comparative_net_profit !== null && (
+                                            <>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={comparative_net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                        {formatCurrency(comparative_net_profit)}
                                                     </span>
-                                                )}
-                                            </span>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-
-                            {/* NET PROFIT */}
-                            <tr className="bg-green-50 font-bold">
-                                <td className="px-6 py-3 text-sm">NET PROFIT</td>
-                                <td className="px-6 py-3 text-sm text-right">
-                                    <span className={net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                        {formatCurrency(net_profit)}
-                                    </span>
-                                </td>
-                                {data.show_comparative && comparative_net_profit !== null && (
-                                    <>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={comparative_net_profit >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                                {formatCurrency(comparative_net_profit)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-3 text-sm text-right">
-                                            <span className={(net_profit - comparative_net_profit) > 0 ? 'text-green-600' : (net_profit - comparative_net_profit) < 0 ? 'text-red-600' : ''}>
-                                                {formatCurrency(Math.abs(net_profit - comparative_net_profit))}
-                                                {(net_profit - comparative_net_profit) !== 0 && (
-                                                    <span className="ml-1 text-xs">
-                                                        {(net_profit - comparative_net_profit) > 0 ? '↑' : '↓'}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right">
+                                                    <span className={(net_profit - comparative_net_profit) > 0 ? 'text-green-600' : (net_profit - comparative_net_profit) < 0 ? 'text-red-600' : ''}>
+                                                        {formatCurrency(Math.abs(net_profit - comparative_net_profit))}
+                                                        {(net_profit - comparative_net_profit) !== 0 && (
+                                                            <span className="ml-1 text-xs">
+                                                                {(net_profit - comparative_net_profit) > 0 ? '↑' : '↓'}
+                                                            </span>
+                                                        )}
                                                     </span>
-                                                )}
-                                            </span>
-                                        </td>
-                                    </>
-                                )}
-                            </tr>
-                        </tbody>
-                    </table>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Profit Summary */}
@@ -832,20 +1087,12 @@ export default function ProfitAndLoss({
             {/* Print Styles */}
             <style jsx global>{`
                 @media print {
-                    body * {
-                        visibility: hidden;
-                    }
-                    .print-container, .print-container * {
-                        visibility: visible;
-                    }
-                    .print-container {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                    }
-                    button, .no-print {
+                    .no-print {
                         display: none !important;
+                    }
+                    body {
+                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact;
                     }
                 }
             `}</style>

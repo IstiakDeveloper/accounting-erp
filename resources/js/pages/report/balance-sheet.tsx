@@ -386,8 +386,8 @@ export default function BalanceSheet({
                 <div class="report-header">
                     <h1>Balance Sheet</h1>
                     <div class="subtitle">As of ${formatDate(data.as_of_date)}</div>
-                    <div class="subtitle">Financial Year: ${financial_year.name}</div>
-                    ${data.show_comparative && comparative_financial_year ? `<div class="subtitle">Comparative Period: ${comparative_financial_year.name}</div>` : ''}
+                    <div class="subtitle">Financial Year: ${formatDate(financial_year.start_date)} to ${formatDate(financial_year.end_date)}</div>
+                    ${data.show_comparative && comparative_financial_year ? `<div class="subtitle">Comparative Period: ${formatDate(comparative_financial_year.start_date)} to ${formatDate(comparative_financial_year.end_date)}</div>` : ''}
                 </div>
 
                 <div class="balance-sheet-container">
@@ -714,7 +714,7 @@ export default function BalanceSheet({
                             >
                                 {financial_years.map((fy) => (
                                     <option key={fy.id} value={fy.id}>
-                                        {fy.name}
+                                        {formatDate(fy.start_date)} to {formatDate(fy.end_date)}
                                     </option>
                                 ))}
                             </select>
@@ -807,11 +807,11 @@ export default function BalanceSheet({
                         As of {formatDate(data.as_of_date)}
                     </p>
                     <p className="text-center text-gray-500">
-                        Financial Year: {financial_year.name}
+                        Financial Year: {formatDate(financial_year.start_date)} to {formatDate(financial_year.end_date)}
                     </p>
                     {data.show_comparative && comparative_financial_year && (
                         <p className="text-center text-gray-500">
-                            Comparative Period: {comparative_financial_year.name}
+                            Comparative Period: {formatDate(comparative_financial_year.start_date)} to {formatDate(comparative_financial_year.end_date)}
                         </p>
                     )}
                 </div>
