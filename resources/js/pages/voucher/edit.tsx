@@ -17,7 +17,7 @@ import {
 interface LedgerAccount {
     id: number;
     name: string;
-    account_code: string;
+    code: string;
     accountGroup: {
         id: number;
         name: string;
@@ -64,7 +64,7 @@ interface VoucherItem {
     ledgerAccount?: {
         id: number;
         name: string;
-        account_code: string;
+        code: string;
     };
     costCenter?: {
         id: number;
@@ -92,6 +92,8 @@ interface Voucher {
 
 interface Props {
     voucher: Voucher;
+    voucher_type: VoucherType;
+    financial_year: FinancialYear;
     grouped_accounts: {
         [key: string]: LedgerAccount[];
     };
@@ -101,18 +103,37 @@ interface Props {
 
 export default function VoucherEdit({
     voucher,
+    voucher_type,
+    financial_year,
     grouped_accounts,
     parties,
     cost_centers
 }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
+    // Check if required props are defined to avoid undefined errors
+    if (!voucher || !voucher_type || !financial_year || !grouped_accounts || !parties) {
+        return (
+            <AppLayout title="Error Loading Form">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                    <p>Could not load voucher edit form. Some required information is missing.</p>
+                    <Link
+                        href={route('voucher.index')}
+                        className="mt-2 inline-flex items-center text-sm text-blue-600 hover:text-blue-700"
+                    >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Return to Vouchers
+                    </Link>
+                </div>
+            </AppLayout>
+        );
+    }
+    const { data, setData, post, processing, errors } = useForm({
         voucher_number: voucher.voucher_number,
         date: voucher.date,
         party_id: voucher.party_id || '',
         narration: voucher.narration || '',
         reference: voucher.reference || '',
         is_posted: voucher.is_posted,
-        items: voucher.voucherItems.map(item => ({
+        items: (voucher.voucherItems || []).map(item => ({
             id: item.id,
             ledger_account_id: item.ledger_account_id,
             cost_center_id: item.cost_center_id,
@@ -151,7 +172,7 @@ export default function VoucherEdit({
             return;
         }
 
-        put(route('voucher.update', voucher.id));
+        post(route('voucher.update', voucher.id));
     };
 
     const handleItemChange = (index: number, field: string, value: any) => {
@@ -161,13 +182,8 @@ export default function VoucherEdit({
             [field]: value,
         };
 
-        // If entering debit amount, clear credit amount (and vice versa)
-        if (field === 'debit_amount' && parseFloat(value) > 0) {
-            updatedItems[index].credit_amount = '';
-        } else if (field === 'credit_amount' && parseFloat(value) > 0) {
-            updatedItems[index].debit_amount = '';
-        }
-
+        // We're not clearing the other field anymore to allow both debit and credit values
+        // Just update the items
         setData('items', updatedItems);
     };
 
@@ -204,8 +220,8 @@ export default function VoucherEdit({
     };
 
     return (
-        <AppLayout title={`Edit ${voucher.voucherType.name}`}>
-            <Head title={`Edit ${voucher.voucherType.name}`} />
+        <AppLayout title={`Edit ${voucher_type?.name || 'Voucher'}`}>
+            <Head title={`Edit ${voucher_type?.name || 'Voucher'}`} />
 
             <div className="mb-6">
                 <Link
@@ -220,7 +236,7 @@ export default function VoucherEdit({
             <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="px-4 py-5 sm:p-6">
                     <h3 className="text-lg leading-6 font-medium text-slate-900">
-                        Edit {voucher.voucherType.name}
+                        Edit {voucher_type?.name || 'Voucher'}
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
                         Edit the voucher details and items.
@@ -294,7 +310,7 @@ export default function VoucherEdit({
                                                 }`}
                                         >
                                             <option value="">-- Select Party --</option>
-                                            {parties.map((party) => (
+                                            {(parties || []).map((party) => (
                                                 <option key={party.id} value={party.id}>
                                                     {party.name}
                                                 </option>
@@ -391,11 +407,11 @@ export default function VoucherEdit({
                                             required
                                         >
                                             <option value="">-- Select Account --</option>
-                                            {Object.keys(grouped_accounts).map((groupName) => (
+                                            {Object.keys(grouped_accounts || {}).map((groupName) => (
                                                 <optgroup key={groupName} label={groupName}>
-                                                    {grouped_accounts[groupName].map((account) => (
+                                                    {(grouped_accounts[groupName] || []).map((account) => (
                                                         <option key={account.id} value={account.id}>
-                                                            {account.name} ({account.account_code})
+                                                            {account.name} ({account.code})
                                                         </option>
                                                     ))}
                                                 </optgroup>
@@ -413,7 +429,7 @@ export default function VoucherEdit({
                                             className="block w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm text-sm focus:ring-blue-500 focus:border-blue-500"
                                         >
                                             <option value="">-- None --</option>
-                                            {cost_centers.map((center) => (
+                                            {(cost_centers || []).map((center) => (
                                                 <option key={center.id} value={center.id}>
                                                     {center.name} ({center.code})
                                                 </option>

@@ -149,18 +149,36 @@ class VoucherController extends Controller
             ->where('business_id', $businessId)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function($account) {
+                return [
+                    'id' => $account->id,
+                    'name' => $account->name,
+                    'code' => $account->code,
+                    'accountGroup' => [
+                        'id' => $account->accountGroup->id,
+                        'name' => $account->accountGroup->name,
+                    ]
+                ];
+            });
 
         // Group ledger accounts by account group
         $groupedAccounts = $ledgerAccounts->groupBy(function($account) {
-            return $account->accountGroup->name;
+            return $account['accountGroup']['name'];
         });
 
         // Get parties
         $parties = Party::where('business_id', $businessId)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function($party) {
+                return [
+                    'id' => $party->id,
+                    'name' => $party->name,
+                    'type' => $party->type,
+                ];
+            });
 
         // Get cost centers if enabled
         $costCenters = [];
@@ -168,13 +186,34 @@ class VoucherController extends Controller
             $costCenters = CostCenter::where('business_id', $businessId)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get();
+                ->get()
+                ->map(function($center) {
+                    return [
+                        'id' => $center->id,
+                        'name' => $center->name,
+                        'code' => $center->code,
+                    ];
+                });
         }
 
         return Inertia::render('voucher/create', [
-            'voucher_type' => $voucherType,
+            'voucher_type' => [
+                'id' => $voucherType->id,
+                'name' => $voucherType->name,
+                'code' => $voucherType->code,
+                'prefix' => $voucherType->prefix,
+                'suffix' => $voucherType->suffix,
+                'is_active' => $voucherType->is_active,
+            ],
             'next_voucher_number' => $nextVoucherNumber,
-            'financial_year' => $financialYear,
+            'financial_year' => [
+                'id' => $financialYear->id,
+                'name' => $financialYear->name,
+                'start_date' => $financialYear->start_date ? $financialYear->start_date->format('Y-m-d') : null,
+                'end_date' => $financialYear->end_date ? $financialYear->end_date->format('Y-m-d') : null,
+                'is_current' => $financialYear->is_current,
+                'is_locked' => $financialYear->is_locked,
+            ],
             'grouped_accounts' => $groupedAccounts,
             'parties' => $parties,
             'cost_centers' => $costCenters,
@@ -350,18 +389,36 @@ class VoucherController extends Controller
             ->where('business_id', $businessId)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function($account) {
+                return [
+                    'id' => $account->id,
+                    'name' => $account->name,
+                    'code' => $account->code,
+                    'accountGroup' => [
+                        'id' => $account->accountGroup->id,
+                        'name' => $account->accountGroup->name,
+                    ]
+                ];
+            });
 
         // Group ledger accounts by account group
         $groupedAccounts = $ledgerAccounts->groupBy(function($account) {
-            return $account->accountGroup->name;
+            return $account['accountGroup']['name'];
         });
 
         // Get parties
         $parties = Party::where('business_id', $businessId)
             ->where('is_active', true)
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function($party) {
+                return [
+                    'id' => $party->id,
+                    'name' => $party->name,
+                    'type' => $party->type,
+                ];
+            });
 
         // Get cost centers if enabled
         $costCenters = [];
@@ -369,11 +426,89 @@ class VoucherController extends Controller
             $costCenters = CostCenter::where('business_id', $businessId)
                 ->where('is_active', true)
                 ->orderBy('name')
-                ->get();
+                ->get()
+                ->map(function($center) {
+                    return [
+                        'id' => $center->id,
+                        'name' => $center->name,
+                        'code' => $center->code,
+                    ];
+                });
         }
 
+        // Format voucher data
+        $voucherData = [
+            'id' => $voucher->id,
+            'voucher_type_id' => $voucher->voucher_type_id,
+            'financial_year_id' => $voucher->financial_year_id,
+            'voucher_number' => $voucher->voucher_number,
+            'date' => $voucher->date->format('Y-m-d'),
+            'party_id' => $voucher->party_id,
+            'narration' => $voucher->narration,
+            'reference' => $voucher->reference,
+            'is_posted' => $voucher->is_posted,
+            'total_amount' => $voucher->total_amount,
+            'voucherType' => [
+                'id' => $voucher->voucherType->id,
+                'name' => $voucher->voucherType->name,
+                'code' => $voucher->voucherType->code,
+                'prefix' => $voucher->voucherType->prefix,
+                'suffix' => $voucher->voucherType->suffix,
+                'is_active' => $voucher->voucherType->is_active,
+            ],
+            'financialYear' => [
+                'id' => $voucher->financialYear->id,
+                'name' => $voucher->financialYear->name,
+                'start_date' => $voucher->financialYear->start_date ? $voucher->financialYear->start_date->format('Y-m-d') : null,
+                'end_date' => $voucher->financialYear->end_date ? $voucher->financialYear->end_date->format('Y-m-d') : null,
+                'is_current' => $voucher->financialYear->is_current,
+                'is_locked' => $voucher->financialYear->is_locked,
+            ],
+            'party' => $voucher->party ? [
+                'id' => $voucher->party->id,
+                'name' => $voucher->party->name,
+                'type' => $voucher->party->type,
+            ] : null,
+            'voucherItems' => $voucher->voucherItems->map(function($item) {
+                return [
+                    'id' => $item->id,
+                    'ledger_account_id' => $item->ledger_account_id,
+                    'cost_center_id' => $item->cost_center_id,
+                    'debit_amount' => $item->debit_amount,
+                    'credit_amount' => $item->credit_amount,
+                    'narration' => $item->narration,
+                    'ledgerAccount' => [
+                        'id' => $item->ledgerAccount->id,
+                        'name' => $item->ledgerAccount->name,
+                        'code' => $item->ledgerAccount->code,
+                    ],
+                    'costCenter' => $item->costCenter ? [
+                        'id' => $item->costCenter->id,
+                        'name' => $item->costCenter->name,
+                        'code' => $item->costCenter->code,
+                    ] : null,
+                ];
+            })->toArray(),
+        ];
+
         return Inertia::render('voucher/edit', [
-            'voucher' => $voucher,
+            'voucher' => $voucherData,
+            'voucher_type' => [
+                'id' => $voucher->voucherType->id,
+                'name' => $voucher->voucherType->name,
+                'code' => $voucher->voucherType->code,
+                'prefix' => $voucher->voucherType->prefix,
+                'suffix' => $voucher->voucherType->suffix,
+                'is_active' => $voucher->voucherType->is_active,
+            ],
+            'financial_year' => [
+                'id' => $voucher->financialYear->id,
+                'name' => $voucher->financialYear->name,
+                'start_date' => $voucher->financialYear->start_date ? $voucher->financialYear->start_date->format('Y-m-d') : null,
+                'end_date' => $voucher->financialYear->end_date ? $voucher->financialYear->end_date->format('Y-m-d') : null,
+                'is_current' => $voucher->financialYear->is_current,
+                'is_locked' => $voucher->financialYear->is_locked,
+            ],
             'grouped_accounts' => $groupedAccounts,
             'parties' => $parties,
             'cost_centers' => $costCenters,
@@ -385,7 +520,7 @@ class VoucherController extends Controller
      */
     public function update(Request $request, $id)
     {
-        $voucher = Voucher::findOrFail($id);
+        $voucher = Voucher::with('financialYear')->findOrFail($id);
         $businessId = session('current_business_id');
 
         if ($voucher->business_id != $businessId) {
@@ -413,6 +548,16 @@ class VoucherController extends Controller
             'items.*.narration' => 'nullable|string',
         ]);
 
+        // Verify each voucher item belongs to this voucher
+        foreach ($request->items as $item) {
+            if (isset($item['id'])) {
+                $existingItem = VoucherItem::find($item['id']);
+                if ($existingItem && $existingItem->voucher_id != $voucher->id) {
+                    return back()->withErrors(['error' => 'Invalid voucher item.']);
+                }
+            }
+        }
+
         // Check if voucher number already exists
         $voucherExists = Voucher::where('business_id', $businessId)
             ->where('voucher_type_id', $voucher->voucher_type_id)
@@ -430,6 +575,22 @@ class VoucherController extends Controller
             $party = Party::findOrFail($request->party_id);
             if ($party->business_id != $businessId) {
                 return back()->withErrors(['error' => 'Invalid party.']);
+            }
+        }
+
+        // Verify each ledger account belongs to this business
+        foreach ($request->items as $item) {
+            $ledgerAccount = LedgerAccount::findOrFail($item['ledger_account_id']);
+            if ($ledgerAccount->business_id != $businessId) {
+                return back()->withErrors(['error' => 'Invalid ledger account.']);
+            }
+
+            // Verify cost center if provided
+            if (isset($item['cost_center_id']) && $item['cost_center_id']) {
+                $costCenter = CostCenter::findOrFail($item['cost_center_id']);
+                if ($costCenter->business_id != $businessId) {
+                    return back()->withErrors(['error' => 'Invalid cost center.']);
+                }
             }
         }
 
