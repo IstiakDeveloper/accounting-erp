@@ -346,8 +346,14 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                     permission: 'reports.view'
                 },
                 {
-                    label: 'Profit & Loss',
-                    href: '/report/profit-loss',
+                    label: 'Income & Expenditure',
+                    href: '/report/income-expenditure',
+                    icon: <FileText size={18} />,
+                    permission: 'reports.view'
+                },
+                {
+                    label: 'Receipt & Payment',
+                    href: '/report/receipt-payment',
                     icon: <FileText size={18} />,
                     permission: 'reports.view'
                 },

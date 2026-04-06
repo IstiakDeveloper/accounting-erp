@@ -9,17 +9,17 @@ interface Business {
     currency: string;
 }
 
-interface FinancialYearInfo {
-    start_date: string;
-    end_date: string;
+interface Row {
+    kind: string;
     label: string;
+    month: number;
+    ytd: number;
+    ledger_account_id?: number;
 }
 
-interface BsRow {
-    label: string;
-    previous: number;
-    current: number;
-    kind: 'bf' | 'surplus' | 'asset' | 'sub_total' | 'total' | 'blank';
+interface GridRow {
+    left: Row | null; // Expenditure
+    right: Row | null; // Income
 }
 
 interface Props {
@@ -27,28 +27,30 @@ interface Props {
     error: string | null;
     report_title: string;
     report_date: string;
-    previous_label: string;
-    current_label: string;
-    previous_date_label: string;
-    current_date_label: string;
-    financial_year: FinancialYearInfo | null;
-    fund_rows: BsRow[];
-    asset_rows: BsRow[];
-    totals: { previous: number; current: number };
+    month_short_label: string;
+    month_column_label: string;
+    month_period_label: string;
+    year_column_label: string;
+    cumulative_ytd_range_label: string;
+    ytd_as_of_date?: string | null;
+    financial_year: { start_date: string; end_date: string; label: string } | null;
+    expenditure_totals: { month: number; ytd: number };
+    income_totals: { month: number; ytd: number };
+    grid_rows: GridRow[];
 }
 
-export default function BalanceSheet({
+export default function IncomeExpenditure({
     business,
     error,
     report_title,
     report_date,
-    previous_label,
-    current_label,
-    previous_date_label,
-    current_date_label,
+    month_short_label,
+    month_column_label,
+    month_period_label,
+    year_column_label,
+    cumulative_ytd_range_label,
     financial_year,
-    fund_rows,
-    asset_rows,
+    grid_rows,
 }: Props) {
     const { data, setData, get, processing } = useForm({
         report_date: typeof report_date === 'string' ? report_date.split('T')[0] : report_date,
@@ -57,8 +59,15 @@ export default function BalanceSheet({
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(amount));
 
+    const formatDate = (dateString: string) => {
+        const d = new Date(dateString);
+        const day = d.getDate().toString().padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    };
+
     const applyFilters = () => {
-        get(route('report.balance_sheet'), { preserveState: true, preserveScroll: true });
+        get(route('report.income_expenditure'), { preserveState: true, preserveScroll: true });
     };
 
     const resetFilters = () => {
@@ -69,25 +78,14 @@ export default function BalanceSheet({
         const w = window.open('', '_blank');
         if (!w) return;
 
-        const max = Math.max(fund_rows.length, asset_rows.length);
-        const body = Array.from({ length: max })
-            .map((_, i) => {
-                const l = fund_rows[i];
-                const r = asset_rows[i];
-                const isTot = l?.kind === 'total' || r?.kind === 'total';
-                const isSub = l?.kind === 'sub_total' || r?.kind === 'sub_total';
-                const cls = isTot ? ' class="tot"' : isSub ? ' class="sub"' : '';
-                const lPrev = l && l.kind !== 'blank' ? formatCurrency(l.previous) : '';
-                const lCur = l && l.kind !== 'blank' ? formatCurrency(l.current) : '';
-                const rPrev = r && r.kind !== 'blank' ? formatCurrency(r.previous) : '';
-                const rCur = r && r.kind !== 'blank' ? formatCurrency(r.current) : '';
+        const tableBody = grid_rows
+            .map((r) => {
+                const l = r.left;
+                const rt = r.right;
+                const cls = l?.kind === 'total' || rt?.kind === 'total' ? ' class="tot"' : '';
                 return `<tr${cls}>
-                    <td class="item">${l?.label ?? ''}</td>
-                    <td class="num">${lPrev}</td>
-                    <td class="num">${lCur}</td>
-                    <td class="item">${r?.label ?? ''}</td>
-                    <td class="num">${rPrev}</td>
-                    <td class="num">${rCur}</td>
+                    <td class="item">${l?.label ?? ''}</td><td class="num">${l ? formatCurrency(l.month) : ''}</td><td class="num">${l ? formatCurrency(l.ytd) : ''}</td>
+                    <td class="item">${rt?.label ?? ''}</td><td class="num">${rt ? formatCurrency(rt.month) : ''}</td><td class="num">${rt ? formatCurrency(rt.ytd) : ''}</td>
                 </tr>`;
             })
             .join('');
@@ -107,14 +105,17 @@ h1{ font-size:14pt; margin:0; font-weight:700; }
 .addr{ font-size:9pt; color:#333; margin-top:1mm; }
 .title{ font-size:11pt; font-weight:700; margin-top:2mm; }
 .sub{ font-size:7pt; color:#333; margin-top:1mm; }
+.sub2{ font-size:6.5pt; color:#444; margin-top:0.5mm; }
 table{ width:100%; border-collapse:collapse; table-layout:fixed; }
 th,td{ border:1px solid #333; padding:2mm 2.5mm; vertical-align:top; }
 thead th{ background:#d9d9d9; font-weight:700; vertical-align:middle; text-align:center; }
 th.num, td.num{ text-align:right; font-variant-numeric: tabular-nums; }
 td.item{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-tr.sub td{ background:#f2f2f2; font-weight:700; }
-tr.tot td{ background:#e8e8e8; font-weight:700; }
+tr.tot td{ font-weight:700; background:#e8e8e8; }
+.hdr{ font-size:9pt; line-height:1.15; }
+.hdrMain{ display:block; white-space:nowrap; }
 .hdrSub{ display:block; font-weight:400; font-size:6.5pt; color:#444; margin-top:0.5mm; white-space:nowrap; }
+.foot{ margin-top:4mm; display:flex; justify-content:space-between; gap:8mm; font-size:9pt; color:#333; }
 </style></head><body>
 <div class="topbar">
   <div></div>
@@ -122,11 +123,12 @@ tr.tot td{ background:#e8e8e8; font-weight:700; }
     <h1>${business?.name ?? ''}</h1>
     ${business?.address ? `<div class="addr">${business.address}</div>` : ''}
     <div class="title">${report_title}</div>
-    <div class="sub">Financial year: ${fyLabel} · As of: ${current_date_label}</div>
+    <div class="sub">Financial year: ${fyLabel}</div>
+    <div class="sub2">Report date: ${formatDate(data.report_date)}</div>
   </div>
   <div class="badgeBox">
-    <div class="badge">${current_label}</div>
-    <span class="small">Current column</span>
+    <div class="badge">${month_short_label}</div>
+    <span class="small">Month column</span>
   </div>
 </div>
 
@@ -141,20 +143,22 @@ tr.tot td{ background:#e8e8e8; font-weight:700; }
   </colgroup>
   <thead>
     <tr>
-      <th colspan="3">Fund &amp; Liabilities</th>
-      <th colspan="3">Assets</th>
+      <th colspan="3">Expenditure</th>
+      <th colspan="3">Income</th>
     </tr>
     <tr>
-      <th>Fund / liabilities</th>
-      <th>${previous_label}<span class="hdrSub">${previous_date_label}</span></th>
-      <th>${current_label}<span class="hdrSub">${current_date_label}</span></th>
-      <th>Assets</th>
-      <th>${previous_label}<span class="hdrSub">${previous_date_label}</span></th>
-      <th>${current_label}<span class="hdrSub">${current_date_label}</span></th>
+      <th>Expenditure items</th>
+      <th class="hdr"><span class="hdrMain">${month_column_label}</span><span class="hdrSub">${month_period_label}</span></th>
+      <th class="hdr"><span class="hdrMain">Current FY</span><span class="hdrSub">${cumulative_ytd_range_label}</span></th>
+      <th>Income items</th>
+      <th class="hdr"><span class="hdrMain">${month_column_label}</span><span class="hdrSub">${month_period_label}</span></th>
+      <th class="hdr"><span class="hdrMain">Current FY</span><span class="hdrSub">${cumulative_ytd_range_label}</span></th>
     </tr>
   </thead>
-  <tbody>${body}</tbody>
+  <tbody>${tableBody}</tbody>
 </table>
+
+<div class="foot"><span>Basis: income &amp; expense ledgers (account group nature)</span><span></span></div>
 </body></html>`);
         w.document.close();
         w.print();
@@ -163,30 +167,29 @@ tr.tot td{ background:#e8e8e8; font-weight:700; }
     const exportCsv = () => {
         let csv = 'data:text/csv;charset=utf-8,';
         csv += `${report_title},${business?.name ?? ''}\n`;
-        csv += `As of,${data.report_date}\n\n`;
-        csv += `Fund/Liabilities,${previous_label},${current_label},Assets,${previous_label},${current_label}\n`;
-        const max = Math.max(fund_rows.length, asset_rows.length);
-        for (let i = 0; i < max; i++) {
-            const l = fund_rows[i];
-            const r = asset_rows[i];
-            csv += `"${l?.label ?? ''}",${l?.previous ?? ''},${l?.current ?? ''},"${r?.label ?? ''}",${r?.previous ?? ''},${r?.current ?? ''}\n`;
-        }
+        csv += `Report date,${data.report_date}\n`;
+        csv += `Month range,${month_period_label}\n`;
+        csv += `FY range,${cumulative_ytd_range_label}\n\n`;
+        csv += `Expenditure items,${month_column_label},Current FY,Income items,${month_column_label},Current FY\n`;
+        grid_rows.forEach((row) => {
+            csv += `"${row.left?.label ?? ''}",${row.left?.month ?? ''},${row.left?.ytd ?? ''},"${row.right?.label ?? ''}",${row.right?.month ?? ''},${row.right?.ytd ?? ''}\n`;
+        });
         const a = document.createElement('a');
         a.href = encodeURI(csv);
-        a.download = `balance_sheet_${data.report_date}.csv`;
+        a.download = `income_expenditure_${data.report_date}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
     };
 
     return (
-        <AppLayout title="Balance Sheet">
+        <AppLayout title="Income & Expenditure">
             <Head title={report_title} />
 
             <div className="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2">
                 <div>
                     <h1 className="text-xl font-semibold text-gray-900">{report_title}</h1>
-                    <p className="text-xs text-gray-500 mt-0.5">NGO-style balance sheet (Uddhrittopotro) matching the paper format.</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Date-driven: month-to-date and FY-to-date through the selected date.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <button
@@ -252,9 +255,9 @@ tr.tot td{ background:#e8e8e8; font-weight:700; }
                     <div className="px-3 py-3 border-b border-gray-400 bg-gray-100 relative">
                         <div className="absolute right-3 top-3 text-center">
                             <span className="inline-block rounded border border-gray-500 px-2 py-1 text-sm font-bold text-gray-900 bg-white">
-                                {current_label}
+                                {month_short_label}
                             </span>
-                            <p className="text-[10px] text-gray-500 mt-1">Current column</p>
+                            <p className="text-[10px] text-gray-500 mt-1">Month column</p>
                         </div>
 
                         <div className="text-center px-10">
@@ -270,56 +273,73 @@ tr.tot td{ background:#e8e8e8; font-weight:700; }
                             <thead>
                                 <tr className="bg-gray-300">
                                     <th colSpan={3} className="border border-gray-400 px-2 py-2 text-center font-bold text-gray-900">
-                                        Fund &amp; liabilities
+                                        Expenditure
                                     </th>
                                     <th colSpan={3} className="border border-gray-400 px-2 py-2 text-center font-bold text-gray-900">
-                                        Assets
+                                        Income
                                     </th>
                                 </tr>
                                 <tr className="bg-gray-200">
                                     <th className="border border-gray-400 px-2 py-2 text-left font-semibold text-gray-800 w-[28%]">
-                                        Fund / liabilities
+                                        Expenditure items
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{previous_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">{previous_date_label}</span>
+                                        <span className="block">{month_column_label}</span>
+                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
+                                            {month_period_label}
+                                        </span>
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{current_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">{current_date_label}</span>
+                                        <span className="block">Current FY</span>
+                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
+                                            {cumulative_ytd_range_label}
+                                        </span>
                                     </th>
-                                    <th className="border border-gray-400 px-2 py-2 text-left font-semibold text-gray-800 w-[28%]">Assets</th>
-                                    <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{previous_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">{previous_date_label}</span>
+                                    <th className="border border-gray-400 px-2 py-2 text-left font-semibold text-gray-800 w-[28%]">
+                                        Income items
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{current_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">{current_date_label}</span>
+                                        <span className="block">{month_column_label}</span>
+                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
+                                            {month_period_label}
+                                        </span>
+                                    </th>
+                                    <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
+                                        <span className="block">Current FY</span>
+                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
+                                            {cumulative_ytd_range_label}
+                                        </span>
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {Array.from({ length: Math.max(fund_rows.length, asset_rows.length) }).map((_, idx) => {
-                                    const l = fund_rows[idx];
-                                    const r = asset_rows[idx];
-                                    const isTotal = l?.kind === 'total' || r?.kind === 'total';
-                                    const isSub = l?.kind === 'sub_total' || r?.kind === 'sub_total';
+                                {grid_rows.map((row, idx) => {
+                                    const isTotal = row.left?.kind === 'total' || row.right?.kind === 'total';
+                                    const isSubTotal = row.left?.kind === 'sub_total' || row.right?.kind === 'sub_total';
                                     return (
-                                        <tr key={idx} className={isTotal ? 'bg-gray-200 font-bold' : isSub ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'}>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{l?.label ?? ''}</td>
+                                        <tr
+                                            key={idx}
+                                            className={
+                                                isTotal
+                                                    ? 'bg-gray-200 font-bold'
+                                                    : isSubTotal
+                                                      ? 'bg-gray-100 font-semibold'
+                                                      : 'hover:bg-gray-50'
+                                            }
+                                        >
+                                            <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{row.left?.label ?? ''}</td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {l && l.kind !== 'blank' ? formatCurrency(l.previous) : ''}
+                                                {row.left && row.left.kind !== 'blank' ? formatCurrency(row.left.month) : ''}
                                             </td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {l && l.kind !== 'blank' ? formatCurrency(l.current) : ''}
+                                                {row.left && row.left.kind !== 'blank' ? formatCurrency(row.left.ytd) : ''}
                                             </td>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{r?.label ?? ''}</td>
+                                            <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{row.right?.label ?? ''}</td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {r && r.kind !== 'blank' ? formatCurrency(r.previous) : ''}
+                                                {row.right && row.right.kind !== 'blank' ? formatCurrency(row.right.month) : ''}
                                             </td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {r && r.kind !== 'blank' ? formatCurrency(r.current) : ''}
+                                                {row.right && row.right.kind !== 'blank' ? formatCurrency(row.right.ytd) : ''}
                                             </td>
                                         </tr>
                                     );

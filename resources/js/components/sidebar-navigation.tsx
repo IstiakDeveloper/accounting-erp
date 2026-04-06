@@ -167,8 +167,8 @@ const SidebarNavigation = () => {
           icon: <ChevronsRight size={16} />
         },
         {
-          label: 'Profit & Loss',
-          href: '/report/profit-loss',
+          label: 'Income & Expenditure',
+          href: '/report/income-expenditure',
           icon: <ChevronsRight size={16} />
         },
         {

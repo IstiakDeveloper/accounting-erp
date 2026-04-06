@@ -18,6 +18,7 @@ use App\Http\Controllers\PartyController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\ReportConfigurationController;
+use App\Http\Controllers\Report\ReceiptPaymentReportController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\TaxRateController;
@@ -29,6 +30,8 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ApiTokenController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\SuperAdminController;
+use App\Http\Controllers\Report\IncomeExpenditureReportController;
+use App\Http\Controllers\Report\BalanceSheetReportController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -315,8 +318,10 @@ Route::middleware(['auth', 'business'])->group(function () {
     // Reports
     Route::prefix('report')->name('report.')->middleware('permission:reports.view')->group(function () {
         Route::get('/trial-balance', [ReportController::class, 'trialBalance'])->name('trial_balance');
-        Route::get('/balance-sheet', [ReportController::class, 'balanceSheet'])->name('balance_sheet');
+        Route::get('/balance-sheet', BalanceSheetReportController::class)->name('balance_sheet');
         Route::get('/profit-loss', [ReportController::class, 'profitLoss'])->name('profit_loss');
+        Route::get('/income-expenditure', IncomeExpenditureReportController::class)->name('income_expenditure');
+        Route::get('/receipt-payment', ReceiptPaymentReportController::class)->name('receipt_payment');
         Route::get('/cash-flow', [ReportController::class, 'cashFlow'])->name('cash_flow');
         Route::get('/accounts-receivable-aging', [ReportController::class, 'accountsReceivableAging'])->name('accounts_receivable_aging');
         Route::get('/accounts-payable-aging', [ReportController::class, 'accountsPayableAging'])->name('accounts_payable_aging');

@@ -3,19 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\AccountGroup;
-use App\Models\Budget;
-use App\Models\CostCenter;
-use App\Models\Currency;
+use App\Models\Business;
 use App\Models\FinancialYear;
 use App\Models\JournalEntry;
 use App\Models\LedgerAccount;
 use App\Models\Party;
-use App\Models\ReportConfiguration;
-use App\Models\SystemSetting;
 use App\Models\Voucher;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ReportController extends Controller
@@ -30,14 +25,14 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
         // Get financial year
         $financialYearId = $request->financial_year_id;
 
-        if (!$financialYearId) {
+        if (! $financialYearId) {
             $financialYear = FinancialYear::where('business_id', $businessId)
                 ->where('is_current', true)
                 ->first();
@@ -53,7 +48,7 @@ class ReportController extends Controller
             }
         }
 
-        if (!$financialYear) {
+        if (! $financialYear) {
             return redirect()->route('financial_year.create')
                 ->withErrors(['error' => 'Please create a financial year first.']);
         }
@@ -63,11 +58,107 @@ class ReportController extends Controller
         $showZeroBalances = $request->show_zero_balances ?? false;
         $groupBy = $request->group_by ?? 'account_group';
 
-        // Get trial balance with proper relationships loaded
+        // Get all ledger accounts for this business
+        $allAccounts = LedgerAccount::with('accountGroup')
+            ->where('business_id', $businessId)
+            ->where('is_active', true)
+            ->get();
+
+        // Get previous balance (before financial year start)
+        $previousBalance = JournalEntry::getTrialBalance($businessId, $financialYear->start_date->copy()->subDay(), null);
+
+        // Get cash transactions for current period (Voucher entries)
+        $cashEntries = JournalEntry::where('journal_entries.business_id', $businessId)
+            ->where('journal_entries.financial_year_id', $financialYearId)
+            ->where('journal_entries.date', '>=', $financialYear->start_date)
+            ->where('journal_entries.date', '<=', $asOfDate)
+            ->join('vouchers', 'journal_entries.voucher_id', '=', 'vouchers.id')
+            ->selectRaw('
+                journal_entries.ledger_account_id,
+                SUM(journal_entries.debit_amount) as total_debit,
+                SUM(journal_entries.credit_amount) as total_credit
+            ')
+            ->groupBy('journal_entries.ledger_account_id')
+            ->get()
+            ->keyBy('ledger_account_id');
+
+        // Get journal transactions (non-voucher entries)
+        $journalEntries = JournalEntry::where('business_id', $businessId)
+            ->where('financial_year_id', $financialYearId)
+            ->where('date', '>=', $financialYear->start_date)
+            ->where('date', '<=', $asOfDate)
+            ->whereNull('voucher_id')
+            ->selectRaw('
+                ledger_account_id,
+                SUM(debit_amount) as total_debit,
+                SUM(credit_amount) as total_credit
+            ')
+            ->groupBy('ledger_account_id')
+            ->get()
+            ->keyBy('ledger_account_id');
+
+        // Get trial balance with proper relationships loaded (only accounts with entries in current FY)
         $trialBalance = JournalEntry::getTrialBalance($businessId, $asOfDate, $financialYearId);
 
-        // Add opening balances to each entry
+        $trialBalanceAccountIds = $trialBalance->pluck('ledger_account_id')->flip();
+
+        // Enrich entries with detailed breakdown
+        $enrichedBalance = collect();
         foreach ($trialBalance as $entry) {
+            if (! $entry->ledgerAccount) {
+                continue;
+            }
+
+            $previousEntry = $previousBalance->firstWhere('ledger_account_id', $entry->ledger_account_id);
+            $previousDebit = $previousEntry->total_debit ?? 0;
+            $previousCredit = $previousEntry->total_credit ?? 0;
+
+            $cashEntry = $cashEntries[$entry->ledger_account_id] ?? null;
+            $cashDebit = $cashEntry->total_debit ?? 0;
+            $cashCredit = $cashEntry->total_credit ?? 0;
+
+            $journalEntry = $journalEntries[$entry->ledger_account_id] ?? null;
+            $journalDebit = $journalEntry->total_debit ?? 0;
+            $journalCredit = $journalEntry->total_credit ?? 0;
+
+            $entry->previous_debit = $previousDebit;
+            $entry->previous_credit = $previousCredit;
+            $entry->cash_debit = $cashDebit;
+            $entry->cash_credit = $cashCredit;
+            $entry->journal_debit = $journalDebit;
+            $entry->journal_credit = $journalCredit;
+            $entry->current_debit = $entry->total_debit;
+            $entry->current_credit = $entry->total_credit;
+
+            $enrichedBalance->push($entry);
+        }
+
+        // Include accounts that have previous/opening balance but no entries in current FY
+        foreach ($previousBalance as $prevEntry) {
+            if ($trialBalanceAccountIds->has($prevEntry->ledger_account_id)) {
+                continue;
+            }
+            if (! $prevEntry->ledgerAccount || ! $prevEntry->ledgerAccount->accountGroup) {
+                continue;
+            }
+            $entry = new JournalEntry;
+            $entry->ledger_account_id = $prevEntry->ledger_account_id;
+            $entry->total_debit = $prevEntry->total_debit;
+            $entry->total_credit = $prevEntry->total_credit;
+            $entry->setRelation('ledgerAccount', $prevEntry->ledgerAccount);
+            $entry->previous_debit = $prevEntry->total_debit;
+            $entry->previous_credit = $prevEntry->total_credit;
+            $entry->cash_debit = 0;
+            $entry->cash_credit = 0;
+            $entry->journal_debit = 0;
+            $entry->journal_credit = 0;
+            $entry->current_debit = 0;
+            $entry->current_credit = 0;
+            $enrichedBalance->push($entry);
+        }
+
+        // Add opening balances to each entry
+        foreach ($enrichedBalance as $entry) {
             if ($entry->ledgerAccount && $entry->ledgerAccount->opening_balance > 0) {
                 // Check if there's no opening balance entry in journal entries
                 $openingEntryExists = JournalEntry::where('business_id', $businessId)
@@ -75,22 +166,24 @@ class ReportController extends Controller
                     ->where('narration', 'LIKE', '%Opening Balance%')
                     ->exists();
 
-                if (!$openingEntryExists) {
+                if (! $openingEntryExists) {
                     if ($entry->ledgerAccount->opening_balance_type === 'debit') {
-                        $entry->total_debit += $entry->ledgerAccount->opening_balance;
+                        $entry->previous_debit += $entry->ledgerAccount->opening_balance;
                     } else {
-                        $entry->total_credit += $entry->ledgerAccount->opening_balance;
+                        $entry->previous_credit += $entry->ledgerAccount->opening_balance;
                     }
                 }
             }
         }
 
         // Filter out zero balances if requested
-        if (!$showZeroBalances) {
-            $trialBalance = $trialBalance->filter(function ($entry) {
+        if (! $showZeroBalances) {
+            $enrichedBalance = $enrichedBalance->filter(function ($entry) {
                 return abs($entry->total_debit - $entry->total_credit) > 0.01;
             });
         }
+
+        $trialBalance = $enrichedBalance;
 
         // Group by account group if requested
         if ($groupBy == 'account_group') {
@@ -109,14 +202,32 @@ class ReportController extends Controller
             foreach ($groupedEntries as $groupId => $entries) {
                 $group = AccountGroup::find($groupId);
 
-                if (!$group) continue; // Skip if group not found
+                if (! $group) {
+                    continue;
+                } // Skip if group not found
 
                 $totalDebit = 0;
                 $totalCredit = 0;
+                $totalPreviousDebit = 0;
+                $totalPreviousCredit = 0;
+                $totalCashDebit = 0;
+                $totalCashCredit = 0;
+                $totalJournalDebit = 0;
+                $totalJournalCredit = 0;
+                $totalCurrentDebit = 0;
+                $totalCurrentCredit = 0;
 
                 foreach ($entries as $entry) {
                     $totalDebit += $entry->total_debit;
                     $totalCredit += $entry->total_credit;
+                    $totalPreviousDebit += $entry->previous_debit ?? 0;
+                    $totalPreviousCredit += $entry->previous_credit ?? 0;
+                    $totalCashDebit += $entry->cash_debit ?? 0;
+                    $totalCashCredit += $entry->cash_credit ?? 0;
+                    $totalJournalDebit += $entry->journal_debit ?? 0;
+                    $totalJournalCredit += $entry->journal_credit ?? 0;
+                    $totalCurrentDebit += $entry->current_debit ?? 0;
+                    $totalCurrentCredit += $entry->current_credit ?? 0;
                 }
 
                 $groupedBalance[] = [
@@ -124,6 +235,14 @@ class ReportController extends Controller
                     'accounts' => $entries->values(), // Reset array keys
                     'total_debit' => $totalDebit,
                     'total_credit' => $totalCredit,
+                    'previous_debit' => $totalPreviousDebit,
+                    'previous_credit' => $totalPreviousCredit,
+                    'cash_debit' => $totalCashDebit,
+                    'cash_credit' => $totalCashCredit,
+                    'journal_debit' => $totalJournalDebit,
+                    'journal_credit' => $totalJournalCredit,
+                    'current_debit' => $totalCurrentDebit,
+                    'current_credit' => $totalCurrentCredit,
                 ];
             }
 
@@ -138,16 +257,40 @@ class ReportController extends Controller
         // Calculate grand totals
         $grandTotalDebit = 0;
         $grandTotalCredit = 0;
+        $grandTotalPreviousDebit = 0;
+        $grandTotalPreviousCredit = 0;
+        $grandTotalCashDebit = 0;
+        $grandTotalCashCredit = 0;
+        $grandTotalJournalDebit = 0;
+        $grandTotalJournalCredit = 0;
+        $grandTotalCurrentDebit = 0;
+        $grandTotalCurrentCredit = 0;
 
         if ($groupBy == 'account_group') {
             foreach ($trialBalance as $group) {
                 $grandTotalDebit += $group['total_debit'];
                 $grandTotalCredit += $group['total_credit'];
+                $grandTotalPreviousDebit += $group['previous_debit'] ?? 0;
+                $grandTotalPreviousCredit += $group['previous_credit'] ?? 0;
+                $grandTotalCashDebit += $group['cash_debit'] ?? 0;
+                $grandTotalCashCredit += $group['cash_credit'] ?? 0;
+                $grandTotalJournalDebit += $group['journal_debit'] ?? 0;
+                $grandTotalJournalCredit += $group['journal_credit'] ?? 0;
+                $grandTotalCurrentDebit += $group['current_debit'] ?? 0;
+                $grandTotalCurrentCredit += $group['current_credit'] ?? 0;
             }
         } else {
             foreach ($trialBalance as $entry) {
                 $grandTotalDebit += $entry->total_debit;
                 $grandTotalCredit += $entry->total_credit;
+                $grandTotalPreviousDebit += $entry->previous_debit ?? 0;
+                $grandTotalPreviousCredit += $entry->previous_credit ?? 0;
+                $grandTotalCashDebit += $entry->cash_debit ?? 0;
+                $grandTotalCashCredit += $entry->cash_credit ?? 0;
+                $grandTotalJournalDebit += $entry->journal_debit ?? 0;
+                $grandTotalJournalCredit += $entry->journal_credit ?? 0;
+                $grandTotalCurrentDebit += $entry->current_debit ?? 0;
+                $grandTotalCurrentCredit += $entry->current_credit ?? 0;
             }
         }
 
@@ -156,12 +299,24 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
+        // Get business information
+        $business = Business::find($businessId);
+
         return Inertia::render('report/trial-balance', [
+            'business' => $business,
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
             'trial_balance' => $trialBalance,
             'grand_total_debit' => $grandTotalDebit,
             'grand_total_credit' => $grandTotalCredit,
+            'grand_total_previous_debit' => $grandTotalPreviousDebit,
+            'grand_total_previous_credit' => $grandTotalPreviousCredit,
+            'grand_total_cash_debit' => $grandTotalCashDebit,
+            'grand_total_cash_credit' => $grandTotalCashCredit,
+            'grand_total_journal_debit' => $grandTotalJournalDebit,
+            'grand_total_journal_credit' => $grandTotalJournalCredit,
+            'grand_total_current_debit' => $grandTotalCurrentDebit,
+            'grand_total_current_credit' => $grandTotalCurrentCredit,
             'filters' => [
                 'financial_year_id' => $financialYearId,
                 'as_of_date' => $asOfDate,
@@ -182,14 +337,14 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
         // Get financial year
         $financialYearId = $request->financial_year_id;
 
-        if (!$financialYearId) {
+        if (! $financialYearId) {
             $financialYear = FinancialYear::where('business_id', $businessId)
                 ->where('is_current', true)
                 ->first();
@@ -205,7 +360,7 @@ class ReportController extends Controller
             }
         }
 
-        if (!$financialYear) {
+        if (! $financialYear) {
             return redirect()->route('financial_year.create')
                 ->withErrors(['error' => 'Please create a financial year first.']);
         }
@@ -213,8 +368,9 @@ class ReportController extends Controller
         // Get filters
         $asOfDate = $request->as_of_date ?? $financialYear->end_date;
         $showZeroBalances = $request->show_zero_balances ?? false;
-        $showComparative = $request->show_comparative ?? false;
-        $comparativePeriod = $request->comparative_period ?? 'previous_year';
+        // Always show comparative for balance sheet - split between Last Year and Current Year
+        $showComparative = true;
+        $comparativePeriod = 'previous_year';
 
         // Get comparative date if needed
         $comparativeDate = null;
@@ -222,17 +378,21 @@ class ReportController extends Controller
 
         if ($showComparative) {
             if ($comparativePeriod == 'previous_year') {
-                $comparativeDate = Carbon::parse($asOfDate)->subYear()->format('Y-m-d');
-
                 // Get previous financial year
                 $comparativeFinancialYear = FinancialYear::where('business_id', $businessId)
                     ->where('end_date', '<', $financialYear->start_date)
                     ->orderBy('end_date', 'desc')
                     ->first();
-            } else if ($comparativePeriod == 'previous_month') {
+
+                if ($comparativeFinancialYear) {
+                    // For "Last Year", always show the complete previous financial year
+                    // Use the end date of the previous financial year
+                    $comparativeDate = $comparativeFinancialYear->end_date;
+                }
+            } elseif ($comparativePeriod == 'previous_month') {
                 $comparativeDate = Carbon::parse($asOfDate)->subMonth()->format('Y-m-d');
                 $comparativeFinancialYear = $financialYear; // Same financial year
-            } else if ($comparativePeriod == 'previous_quarter') {
+            } elseif ($comparativePeriod == 'previous_quarter') {
                 $comparativeDate = Carbon::parse($asOfDate)->subMonths(3)->format('Y-m-d');
                 $comparativeFinancialYear = $financialYear; // Same financial year
             }
@@ -244,9 +404,9 @@ class ReportController extends Controller
                 $query->with([
                     'children' => function ($subQuery) {
                         $subQuery->with('children')->orderBy('sequence');
-                    }
+                    },
                 ])->orderBy('sequence');
-            }
+            },
         ])
             ->where('business_id', $businessId)
             ->where('nature', 'assets')
@@ -259,9 +419,9 @@ class ReportController extends Controller
                 $query->with([
                     'children' => function ($subQuery) {
                         $subQuery->with('children')->orderBy('sequence');
-                    }
+                    },
                 ])->orderBy('sequence');
-            }
+            },
         ])
             ->where('business_id', $businessId)
             ->where('nature', 'liabilities')
@@ -274,9 +434,9 @@ class ReportController extends Controller
                 $query->with([
                     'children' => function ($subQuery) {
                         $subQuery->with('children')->orderBy('sequence');
-                    }
+                    },
                 ])->orderBy('sequence');
-            }
+            },
         ])
             ->where('business_id', $businessId)
             ->where('nature', 'equity')
@@ -289,9 +449,9 @@ class ReportController extends Controller
         $liabilityGroups = $this->calculateAccountGroupBalances($businessId, $asOfDate, $financialYearId, $liabilityGroups, $showZeroBalances);
         $equityGroups = $this->calculateAccountGroupBalances($businessId, $asOfDate, $financialYearId, $equityGroups, $showZeroBalances);
 
-        // Get net profit (or loss)
-        $incomeTotals = $this->calculateTotals($businessId, 'income', $asOfDate, $financialYearId);
-        $expenseTotals = $this->calculateTotals($businessId, 'expense', $asOfDate, $financialYearId);
+        // Get net profit (or loss) - cumulative for Balance Sheet (retained earnings)
+        $incomeTotals = $this->calculateTotals($businessId, 'income', $asOfDate, $financialYearId, true);
+        $expenseTotals = $this->calculateTotals($businessId, 'expense', $asOfDate, $financialYearId, true);
         $netProfit = $incomeTotals['total'] - $expenseTotals['total'];
 
         // Calculate totals for assets, liabilities, and equity
@@ -319,9 +479,9 @@ class ReportController extends Controller
                     $query->with([
                         'children' => function ($subQuery) {
                             $subQuery->with('children')->orderBy('sequence');
-                        }
+                        },
                     ])->orderBy('sequence');
-                }
+                },
             ])
                 ->where('business_id', $businessId)
                 ->where('nature', 'assets')
@@ -334,9 +494,9 @@ class ReportController extends Controller
                     $query->with([
                         'children' => function ($subQuery) {
                             $subQuery->with('children')->orderBy('sequence');
-                        }
+                        },
                     ])->orderBy('sequence');
-                }
+                },
             ])
                 ->where('business_id', $businessId)
                 ->where('nature', 'liabilities')
@@ -349,9 +509,9 @@ class ReportController extends Controller
                     $query->with([
                         'children' => function ($subQuery) {
                             $subQuery->with('children')->orderBy('sequence');
-                        }
+                        },
                     ])->orderBy('sequence');
-                }
+                },
             ])
                 ->where('business_id', $businessId)
                 ->where('nature', 'equity')
@@ -369,9 +529,9 @@ class ReportController extends Controller
             $comparativeLiabilityTotals = $this->calculateTotals($businessId, 'liabilities', $comparativeDate, $comparativeFinancialYear->id);
             $comparativeEquityTotals = $this->calculateTotals($businessId, 'equity', $comparativeDate, $comparativeFinancialYear->id);
 
-            // Calculate comparative net profit
-            $comparativeIncomeTotals = $this->calculateTotals($businessId, 'income', $comparativeDate, $comparativeFinancialYear->id);
-            $comparativeExpenseTotals = $this->calculateTotals($businessId, 'expense', $comparativeDate, $comparativeFinancialYear->id);
+            // Calculate comparative net profit - cumulative for Balance Sheet
+            $comparativeIncomeTotals = $this->calculateTotals($businessId, 'income', $comparativeDate, $comparativeFinancialYear->id, true);
+            $comparativeExpenseTotals = $this->calculateTotals($businessId, 'expense', $comparativeDate, $comparativeFinancialYear->id, true);
             $comparativeNetProfit = $comparativeIncomeTotals['total'] - $comparativeExpenseTotals['total'];
 
             // Add comparative net profit to equity
@@ -383,7 +543,20 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
+        // Get business information for report header
+        $business = Business::find($businessId);
+
+        // Prepare column labels for balance sheet
+        $currentYearLabel = 'Current Year';
+        $lastYearLabel = 'Last Year';
+
+        if ($comparativeFinancialYear) {
+            $lastYearLabel = $comparativeFinancialYear->start_date.' to '.$comparativeDate;
+            $currentYearLabel = $financialYear->start_date.' to '.$asOfDate;
+        }
+
         return Inertia::render('report/balance-sheet', [
+            'business' => $business,
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
             'asset_groups' => $assetGroups,
@@ -401,6 +574,9 @@ class ReportController extends Controller
             'comparative_equity_totals' => $comparativeEquityTotals,
             'comparative_net_profit' => $comparativeNetProfit,
             'comparative_financial_year' => $comparativeFinancialYear,
+            'comparative_date' => $comparativeDate,
+            'last_year_label' => $lastYearLabel,
+            'current_year_label' => $currentYearLabel,
             'filters' => [
                 'financial_year_id' => $financialYearId,
                 'as_of_date' => $asOfDate,
@@ -445,7 +621,60 @@ class ReportController extends Controller
         $accountGroupIds = $this->getAllChildGroupIds($businessId, $accountGroupId);
         $accountGroupIds[] = $accountGroupId; // Include the parent group itself
 
-        // Calculate total from journal entries
+        // Get opening balance for this financial year
+        $openingDebit = 0;
+        $openingCredit = 0;
+
+        if ($financialYearId) {
+            $financialYear = FinancialYear::find($financialYearId);
+
+            if ($financialYear) {
+                // Opening balance = closing balance of previous financial year
+                $previousPeriodDate = Carbon::parse($financialYear->start_date)->subDay()->format('Y-m-d');
+
+                // Get balance until end of previous financial year
+                $openingQuery = JournalEntry::where('business_id', $businessId)
+                    ->whereIn('ledger_account_id', function ($query) use ($accountGroupIds) {
+                        $query->select('id')
+                            ->from('ledger_accounts')
+                            ->whereIn('account_group_id', $accountGroupIds)
+                            ->where('is_active', true);
+                    })
+                    ->where('date', '<=', $previousPeriodDate);
+
+                $openingResult = $openingQuery->selectRaw('
+                    SUM(debit_amount) as total_debit,
+                    SUM(credit_amount) as total_credit
+                ')->first();
+
+                $openingDebit = $openingResult->total_debit ?? 0;
+                $openingCredit = $openingResult->total_credit ?? 0;
+
+                // Add opening balances from ledger accounts only when no Opening Balance journal entry exists (avoid double-count)
+                $ledgerAccountsWithOpening = LedgerAccount::whereIn('account_group_id', $accountGroupIds)
+                    ->where('is_active', true)
+                    ->where('opening_balance', '>', 0)
+                    ->get();
+
+                foreach ($ledgerAccountsWithOpening as $account) {
+                    $openingEntryExists = JournalEntry::where('business_id', $businessId)
+                        ->where('ledger_account_id', $account->id)
+                        ->where('narration', 'LIKE', '%Opening Balance%')
+                        ->where('date', '<=', $previousPeriodDate)
+                        ->exists();
+
+                    if (! $openingEntryExists) {
+                        if ($account->opening_balance_type === 'debit') {
+                            $openingDebit += $account->opening_balance;
+                        } else {
+                            $openingCredit += $account->opening_balance;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Calculate total from journal entries within the financial year period
         $query = JournalEntry::where('business_id', $businessId)
             ->whereIn('ledger_account_id', function ($query) use ($accountGroupIds) {
                 $query->select('id')
@@ -455,8 +684,12 @@ class ReportController extends Controller
             })
             ->where('date', '<=', $asOfDate);
 
+        // If financial year is specified, filter by it (start date to as_of_date)
         if ($financialYearId) {
-            $query->where('financial_year_id', $financialYearId);
+            $financialYear = FinancialYear::find($financialYearId);
+            if ($financialYear) {
+                $query->where('date', '>=', $financialYear->start_date);
+            }
         }
 
         $result = $query->selectRaw('
@@ -464,23 +697,11 @@ class ReportController extends Controller
         SUM(credit_amount) as total_credit
     ')->first();
 
-        $totalDebit = $result->total_debit ?? 0;
-        $totalCredit = $result->total_credit ?? 0;
+        $periodDebit = $result->total_debit ?? 0;
+        $periodCredit = $result->total_credit ?? 0;
 
-        // Get opening balances
-        $openingBalances = LedgerAccount::whereIn('account_group_id', $accountGroupIds)
-            ->where('is_active', true)
-            ->selectRaw('
-            SUM(CASE WHEN opening_balance_type = "debit" THEN opening_balance ELSE 0 END) as opening_debit,
-            SUM(CASE WHEN opening_balance_type = "credit" THEN opening_balance ELSE 0 END) as opening_credit
-        ')
-            ->first();
-
-        $openingDebit = $openingBalances->opening_debit ?? 0;
-        $openingCredit = $openingBalances->opening_credit ?? 0;
-
-        $totalDebit += $openingDebit;
-        $totalCredit += $openingCredit;
+        $totalDebit = $openingDebit + $periodDebit;
+        $totalCredit = $openingCredit + $periodCredit;
 
         // For assets: Debit balance is positive
         // For liabilities and equity: Credit balance is positive
@@ -505,7 +726,7 @@ class ReportController extends Controller
         }
 
         // Filter zero balances if not showing them
-        if (!$showZeroBalances) {
+        if (! $showZeroBalances) {
             $ledgerAccounts = $ledgerAccounts->filter(function ($account) {
                 return abs($account->balance) > 0.01; // Consider very small amounts as zero
             });
@@ -514,21 +735,89 @@ class ReportController extends Controller
         return $ledgerAccounts->values();
     }
 
-    private function getLedgerAccountBalance($businessId, $ledgerAccountId, $asOfDate, $financialYearId)
+    private function getLedgerAccountBalance($businessId, $ledgerAccountId, $asOfDate, $financialYearId, $cumulative = false)
     {
         // Get the ledger account to check its nature
         $ledgerAccount = LedgerAccount::with('accountGroup')->find($ledgerAccountId);
-        if (!$ledgerAccount) {
+        if (! $ledgerAccount) {
             return 0;
         }
 
-        // Calculate from journal entries
+        // Get opening balance for this financial year
+        $openingBalance = 0;
+        $openingDebit = 0;
+        $openingCredit = 0;
+
+        if ($financialYearId) {
+            $financialYear = FinancialYear::find($financialYearId);
+
+            if ($financialYear) {
+                // Opening balance = closing balance of previous financial year
+                // For Balance Sheet accounts, get balance up to the day before financial year start
+                $previousPeriodDate = Carbon::parse($financialYear->start_date)->subDay()->format('Y-m-d');
+
+                $accountNature = $ledgerAccount->accountGroup->nature;
+                $isBalanceSheetAccount = in_array($accountNature, ['assets', 'liabilities', 'equity']);
+
+                if ($isBalanceSheetAccount) {
+                    // Get cumulative balance until end of previous financial year
+                    $openingQuery = JournalEntry::where('business_id', $businessId)
+                        ->where('ledger_account_id', $ledgerAccountId)
+                        ->where('date', '<=', $previousPeriodDate);
+
+                    $openingResult = $openingQuery->selectRaw('
+                        SUM(debit_amount) as total_debit,
+                        SUM(credit_amount) as total_credit
+                    ')->first();
+
+                    $openingDebit = $openingResult->total_debit ?? 0;
+                    $openingCredit = $openingResult->total_credit ?? 0;
+
+                    // Check if there's an opening balance entry in journal entries
+                    $openingEntryExists = JournalEntry::where('business_id', $businessId)
+                        ->where('ledger_account_id', $ledgerAccountId)
+                        ->where('narration', 'LIKE', '%Opening Balance%')
+                        ->where('date', '<=', $previousPeriodDate)
+                        ->exists();
+
+                    // If no opening balance entry in journal entries, add from ledger account opening balance
+                    if (! $openingEntryExists && $ledgerAccount->opening_balance > 0) {
+                        if ($ledgerAccount->opening_balance_type === 'debit') {
+                            $openingDebit += $ledgerAccount->opening_balance;
+                        } else {
+                            $openingCredit += $ledgerAccount->opening_balance;
+                        }
+                    }
+                }
+            }
+        } else {
+            // If no financial year specified, treat like cumulative
+            $openingEntryExists = JournalEntry::where('business_id', $businessId)
+                ->where('ledger_account_id', $ledgerAccountId)
+                ->where('narration', 'LIKE', '%Opening Balance%')
+                ->exists();
+
+            // If no opening balance entry in journal entries, add from ledger account opening balance
+            if (! $openingEntryExists && $ledgerAccount->opening_balance > 0) {
+                if ($ledgerAccount->opening_balance_type === 'debit') {
+                    $openingDebit += $ledgerAccount->opening_balance;
+                } else {
+                    $openingCredit += $ledgerAccount->opening_balance;
+                }
+            }
+        }
+
+        // Calculate from journal entries within the financial year period
         $query = JournalEntry::where('business_id', $businessId)
             ->where('ledger_account_id', $ledgerAccountId)
             ->where('date', '<=', $asOfDate);
 
+        // If financial year is specified, filter by it (for Balance Sheet accounts, this means from start date)
         if ($financialYearId) {
-            $query->where('financial_year_id', $financialYearId);
+            $financialYear = FinancialYear::find($financialYearId);
+            if ($financialYear) {
+                $query->where('date', '>=', $financialYear->start_date);
+            }
         }
 
         $result = $query->selectRaw('
@@ -536,24 +825,11 @@ class ReportController extends Controller
         SUM(credit_amount) as total_credit
     ')->first();
 
-        $totalDebit = $result->total_debit ?? 0;
-        $totalCredit = $result->total_credit ?? 0;
+        $periodDebit = $result->total_debit ?? 0;
+        $periodCredit = $result->total_credit ?? 0;
 
-        // Add opening balance from ledger account (শুধু journal entries তে opening balance entry না থাকলে)
-        // Check if there's an opening balance entry in journal entries
-        $openingEntryExists = JournalEntry::where('business_id', $businessId)
-            ->where('ledger_account_id', $ledgerAccountId)
-            ->where('narration', 'LIKE', '%Opening Balance%')
-            ->exists();
-
-        // If no opening balance entry in journal entries, add from ledger account opening balance
-        if (!$openingEntryExists && $ledgerAccount->opening_balance > 0) {
-            if ($ledgerAccount->opening_balance_type === 'debit') {
-                $totalDebit += $ledgerAccount->opening_balance;
-            } else {
-                $totalCredit += $ledgerAccount->opening_balance;
-            }
-        }
+        $totalDebit = $openingDebit + $periodDebit;
+        $totalCredit = $openingCredit + $periodCredit;
 
         // Calculate balance based on account nature
         $accountNature = $ledgerAccount->accountGroup->nature;
@@ -583,7 +859,7 @@ class ReportController extends Controller
         return $childIds;
     }
 
-    private function calculateTotals($businessId, $nature, $asOfDate, $financialYearId)
+    private function calculateTotals($businessId, $nature, $asOfDate, $financialYearId, $cumulative = false)
     {
         // Get all account groups of the specified nature
         $accountGroupIds = AccountGroup::where('business_id', $businessId)
@@ -601,7 +877,7 @@ class ReportController extends Controller
             return [
                 'total_debit' => 0,
                 'total_credit' => 0,
-                'total' => 0
+                'total' => 0,
             ];
         }
 
@@ -610,7 +886,11 @@ class ReportController extends Controller
             ->whereIn('ledger_account_id', $ledgerAccountIds)
             ->where('date', '<=', $asOfDate);
 
-        if ($financialYearId) {
+        // For Balance Sheet accounts (Assets, Liabilities, Equity), always use cumulative balance
+        // For Income/Expense accounts, use financial year filter unless cumulative is requested
+        $isBalanceSheetNature = in_array($nature, ['assets', 'liabilities', 'equity']);
+
+        if ($financialYearId && ! $isBalanceSheetNature && ! $cumulative) {
             $query->where('financial_year_id', $financialYearId);
         }
 
@@ -636,7 +916,7 @@ class ReportController extends Controller
                 ->exists();
 
             // Only add opening balance if no opening entry exists in journal entries
-            if (!$openingEntryExists) {
+            if (! $openingEntryExists) {
                 if ($account->opening_balance_type === 'debit') {
                     $totalDebit += $account->opening_balance;
                 } else {
@@ -655,9 +935,10 @@ class ReportController extends Controller
         return [
             'total_debit' => $totalDebit,
             'total_credit' => $totalCredit,
-            'total' => $total
+            'total' => $total,
         ];
     }
+
     /**
      * Display the profit and loss report.
      */
@@ -665,14 +946,14 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
         // Get financial year
         $financialYearId = $request->financial_year_id;
 
-        if (!$financialYearId) {
+        if (! $financialYearId) {
             $financialYear = FinancialYear::where('business_id', $businessId)
                 ->where('is_current', true)
                 ->first();
@@ -688,7 +969,7 @@ class ReportController extends Controller
             }
         }
 
-        if (!$financialYear) {
+        if (! $financialYear) {
             return redirect()->route('financial_year.create')
                 ->withErrors(['error' => 'Please create a financial year first.']);
         }
@@ -716,11 +997,11 @@ class ReportController extends Controller
                     ->where('end_date', '<', $financialYear->start_date)
                     ->orderBy('end_date', 'desc')
                     ->first();
-            } else if ($comparativePeriod == 'previous_month') {
+            } elseif ($comparativePeriod == 'previous_month') {
                 $comparativeFromDate = Carbon::parse($fromDate)->subMonth()->format('Y-m-d');
                 $comparativeToDate = Carbon::parse($toDate)->subMonth()->format('Y-m-d');
                 $comparativeFinancialYear = $financialYear;
-            } else if ($comparativePeriod == 'previous_quarter') {
+            } elseif ($comparativePeriod == 'previous_quarter') {
                 $comparativeFromDate = Carbon::parse($fromDate)->subMonths(3)->format('Y-m-d');
                 $comparativeToDate = Carbon::parse($toDate)->subMonths(3)->format('Y-m-d');
                 $comparativeFinancialYear = $financialYear;
@@ -733,9 +1014,9 @@ class ReportController extends Controller
                 $query->with([
                     'children' => function ($subQuery) {
                         $subQuery->with('children')->orderBy('sequence');
-                    }
+                    },
                 ])->orderBy('sequence');
-            }
+            },
         ])
             ->where('business_id', $businessId)
             ->where('nature', 'income')
@@ -748,9 +1029,9 @@ class ReportController extends Controller
                 $query->with([
                     'children' => function ($subQuery) {
                         $subQuery->with('children')->orderBy('sequence');
-                    }
+                    },
                 ])->orderBy('sequence');
-            }
+            },
         ])
             ->where('business_id', $businessId)
             ->where('nature', 'expense')
@@ -799,9 +1080,9 @@ class ReportController extends Controller
                     $query->with([
                         'children' => function ($subQuery) {
                             $subQuery->with('children')->orderBy('sequence');
-                        }
+                        },
                     ])->orderBy('sequence');
-                }
+                },
             ])
                 ->where('business_id', $businessId)
                 ->where('nature', 'income')
@@ -814,9 +1095,9 @@ class ReportController extends Controller
                     $query->with([
                         'children' => function ($subQuery) {
                             $subQuery->with('children')->orderBy('sequence');
-                        }
+                        },
                     ])->orderBy('sequence');
-                }
+                },
             ])
                 ->where('business_id', $businessId)
                 ->where('nature', 'expense')
@@ -846,7 +1127,17 @@ class ReportController extends Controller
             ->orderBy('start_date', 'desc')
             ->get();
 
+        // Get business information for report header
+        $business = Business::find($businessId);
+
+        // Prepare column labels with date ranges
+        // Current Period = selected from-to dates
+        $currentPeriodLabel = $fromDate.' to '.$toDate;
+        // Current Year = financial year start to selected to_date
+        $currentYearLabel = $financialYear->start_date.' to '.$toDate;
+
         return Inertia::render('report/profit-loss', [
+            'business' => $business,
             'financial_year' => $financialYear,
             'financial_years' => $financialYears,
             'income_groups' => $incomeGroups,
@@ -866,6 +1157,8 @@ class ReportController extends Controller
             'comparative_direct_income' => $comparativeDirectIncome,
             'comparative_direct_expense' => $comparativeDirectExpense,
             'comparative_financial_year' => $comparativeFinancialYear,
+            'current_year_label' => $currentYearLabel,
+            'current_period_label' => $currentPeriodLabel,
             'filters' => [
                 'financial_year_id' => $financialYearId,
                 'from_date' => $fromDate,
@@ -920,7 +1213,7 @@ class ReportController extends Controller
         }
 
         // Filter zero balances if not showing them
-        if (!$showZeroBalances) {
+        if (! $showZeroBalances) {
             $ledgerAccounts = $ledgerAccounts->filter(function ($account) {
                 return abs($account->balance) > 0.01;
             });
@@ -933,7 +1226,7 @@ class ReportController extends Controller
     {
         // Get the ledger account to check its nature
         $ledgerAccount = LedgerAccount::with('accountGroup')->find($ledgerAccountId);
-        if (!$ledgerAccount) {
+        if (! $ledgerAccount) {
             return 0;
         }
 
@@ -990,7 +1283,7 @@ class ReportController extends Controller
             return [
                 'total_debit' => 0,
                 'total_credit' => 0,
-                'total' => 0
+                'total' => 0,
             ];
         }
 
@@ -1021,7 +1314,7 @@ class ReportController extends Controller
         return [
             'total_debit' => $totalDebit,
             'total_credit' => $totalCredit,
-            'total' => $total
+            'total' => $total,
         ];
     }
 
@@ -1032,14 +1325,14 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
         // Get financial year
         $financialYearId = $request->financial_year_id;
 
-        if (!$financialYearId) {
+        if (! $financialYearId) {
             $financialYear = FinancialYear::where('business_id', $businessId)
                 ->where('is_current', true)
                 ->first();
@@ -1055,7 +1348,7 @@ class ReportController extends Controller
             }
         }
 
-        if (!$financialYear) {
+        if (! $financialYear) {
             return redirect()->route('financial_year.create')
                 ->withErrors(['error' => 'Please create a financial year first.']);
         }
@@ -1081,10 +1374,10 @@ class ReportController extends Controller
                     ->where('end_date', '<', $financialYear->start_date)
                     ->orderBy('end_date', 'desc')
                     ->first();
-            } else if ($comparativePeriod == 'previous_month') {
+            } elseif ($comparativePeriod == 'previous_month') {
                 $comparativeFromDate = Carbon::parse($fromDate)->subMonth()->format('Y-m-d');
                 $comparativeToDate = Carbon::parse($toDate)->subMonth()->format('Y-m-d');
-            } else if ($comparativePeriod == 'previous_quarter') {
+            } elseif ($comparativePeriod == 'previous_quarter') {
                 $comparativeFromDate = Carbon::parse($fromDate)->subMonths(3)->format('Y-m-d');
                 $comparativeToDate = Carbon::parse($toDate)->subMonths(3)->format('Y-m-d');
             }
@@ -1243,7 +1536,7 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
@@ -1324,9 +1617,9 @@ class ReportController extends Controller
 
                     if ($voucher->voucherType->nature == 'sales' || $voucher->voucherType->nature == 'debit_note') {
                         $voucherAmount = $voucher->total_amount;
-                    } else if ($voucher->voucherType->nature == 'receipt' || $voucher->voucherType->nature == 'credit_note') {
+                    } elseif ($voucher->voucherType->nature == 'receipt' || $voucher->voucherType->nature == 'credit_note') {
                         $voucherAmount = -$voucher->total_amount;
-                    } else if ($voucher->voucherType->nature == 'journal') {
+                    } elseif ($voucher->voucherType->nature == 'journal') {
                         // For journal vouchers, get the amount for this ledger account
                         $journalEntries = JournalEntry::where('voucher_id', $voucher->id)
                             ->where('ledger_account_id', $ledgerAccount->id)
@@ -1411,7 +1704,7 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
@@ -1492,9 +1785,9 @@ class ReportController extends Controller
 
                     if ($voucher->voucherType->nature == 'purchase' || $voucher->voucherType->nature == 'credit_note') {
                         $voucherAmount = $voucher->total_amount;
-                    } else if ($voucher->voucherType->nature == 'payment' || $voucher->voucherType->nature == 'debit_note') {
+                    } elseif ($voucher->voucherType->nature == 'payment' || $voucher->voucherType->nature == 'debit_note') {
                         $voucherAmount = -$voucher->total_amount;
-                    } else if ($voucher->voucherType->nature == 'journal') {
+                    } elseif ($voucher->voucherType->nature == 'journal') {
                         // For journal vouchers, get the amount for this ledger account
                         $journalEntries = JournalEntry::where('voucher_id', $voucher->id)
                             ->where('ledger_account_id', $ledgerAccount->id)
@@ -1575,19 +1868,18 @@ class ReportController extends Controller
     /**
      * Display the party statement report.
      */
-
     public function partyStatement(Request $request)
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
         // If party is not selected, show party selection page
         $partyId = $request->party_id;
 
-        if (!$partyId) {
+        if (! $partyId) {
             $parties = Party::where('business_id', $businessId)
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -1722,7 +2014,7 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
@@ -1756,7 +2048,7 @@ class ReportController extends Controller
         // Group by party or date if requested
         if ($groupBy == 'party') {
             $vouchers = $vouchers->groupBy('party_id');
-        } else if ($groupBy == 'date') {
+        } elseif ($groupBy == 'date') {
             $vouchers = $vouchers->groupBy(function ($voucher) {
                 return $voucher->date->format('Y-m-d');
             });
@@ -1808,7 +2100,7 @@ class ReportController extends Controller
     {
         $businessId = session('current_business_id');
 
-        if (!$businessId) {
+        if (! $businessId) {
             return redirect()->route('business.select');
         }
 
@@ -1842,7 +2134,7 @@ class ReportController extends Controller
         // Group by party or date if requested
         if ($groupBy == 'party') {
             $vouchers = $vouchers->groupBy('party_id');
-        } else if ($groupBy == 'date') {
+        } elseif ($groupBy == 'date') {
             $vouchers = $vouchers->groupBy(function ($voucher) {
                 return $voucher->date->format('Y-m-d');
             });

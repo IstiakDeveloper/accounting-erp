@@ -86,7 +86,8 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
       subItems: [
         { name: 'Trial Balance', href: route('report.trial_balance') },
         { name: 'Balance Sheet', href: route('report.balance_sheet') },
-        { name: 'Profit & Loss', href: route('report.profit_loss') },
+        { name: 'Income & Expenditure', href: route('report.income_expenditure') },
+        { name: 'Receipt & Payment', href: route('report.receipt_payment') },
         { name: 'Sales Register', href: route('report.sales_register') },
         { name: 'Purchase Register', href: route('report.purchase_register') },
       ],
