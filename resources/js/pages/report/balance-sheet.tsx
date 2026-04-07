@@ -19,7 +19,7 @@ interface BsRow {
     label: string;
     previous: number;
     current: number;
-    kind: 'bf' | 'surplus' | 'asset' | 'sub_total' | 'total' | 'blank';
+    kind: 'bf' | 'surplus' | 'asset' | 'sub_total' | 'total' | 'total_fund' | 'grand_total' | 'blank';
 }
 
 interface Props {
@@ -74,9 +74,16 @@ export default function BalanceSheet({
             .map((_, i) => {
                 const l = fund_rows[i];
                 const r = asset_rows[i];
-                const isTot = l?.kind === 'total' || r?.kind === 'total';
+                const isTot =
+                    l?.kind === 'total' ||
+                    r?.kind === 'total' ||
+                    l?.kind === 'total_fund' ||
+                    r?.kind === 'total_fund' ||
+                    l?.kind === 'grand_total' ||
+                    r?.kind === 'grand_total';
                 const isSub = l?.kind === 'sub_total' || r?.kind === 'sub_total';
-                const cls = isTot ? ' class="tot"' : isSub ? ' class="sub"' : '';
+                const isTotalFundRow = l?.kind === 'total_fund';
+                const cls = isTot ? (isTotalFundRow ? ' class="totFund"' : ' class="tot"') : isSub ? ' class="sub"' : '';
                 const lPrev = l && l.kind !== 'blank' ? formatCurrency(l.previous) : '';
                 const lCur = l && l.kind !== 'blank' ? formatCurrency(l.current) : '';
                 const rPrev = r && r.kind !== 'blank' ? formatCurrency(r.previous) : '';
@@ -95,7 +102,7 @@ export default function BalanceSheet({
         const fyLabel = financial_year?.label ?? '—';
 
         w.document.write(`<!DOCTYPE html><html><head><title>${report_title}</title><style>
-@page { size: A4 landscape; margin: 10mm; }
+@page { size: A4 portrait; margin: 10mm; }
 * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body { font-family: "Times New Roman", Times, serif; font-size: 9pt; line-height: 1.15; margin:0; color:#111; }
 .topbar{ display:grid; grid-template-columns: 1fr auto 1fr; align-items:start; column-gap:6mm; margin-bottom:5mm; }
@@ -110,10 +117,15 @@ h1{ font-size:14pt; margin:0; font-weight:700; }
 table{ width:100%; border-collapse:collapse; table-layout:fixed; }
 th,td{ border:1px solid #333; padding:2mm 2.5mm; vertical-align:top; }
 thead th{ background:#d9d9d9; font-weight:700; vertical-align:middle; text-align:center; }
-th.num, td.num{ text-align:right; font-variant-numeric: tabular-nums; }
+td.num{ text-align:right; font-variant-numeric: tabular-nums; }
 td.item{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 tr.sub td{ background:#f2f2f2; font-weight:700; }
 tr.tot td{ background:#e8e8e8; font-weight:700; }
+/* Total fund row: bold only on left side */
+tr.totFund td{ background:#e8e8e8; font-weight:700; }
+tr.totFund td:nth-child(4),
+tr.totFund td:nth-child(5),
+tr.totFund td:nth-child(6){ font-weight:400; background:#fff; }
 .hdrSub{ display:block; font-weight:400; font-size:6.5pt; color:#444; margin-top:0.5mm; white-space:nowrap; }
 </style></head><body>
 <div class="topbar">
@@ -303,22 +315,55 @@ tr.tot td{ background:#e8e8e8; font-weight:700; }
                                 {Array.from({ length: Math.max(fund_rows.length, asset_rows.length) }).map((_, idx) => {
                                     const l = fund_rows[idx];
                                     const r = asset_rows[idx];
-                                    const isTotal = l?.kind === 'total' || r?.kind === 'total';
+                                    const isTotal =
+                                        l?.kind === 'total' ||
+                                        r?.kind === 'total' ||
+                                        l?.kind === 'total_fund' ||
+                                        r?.kind === 'total_fund' ||
+                                        l?.kind === 'grand_total' ||
+                                        r?.kind === 'grand_total';
+                                    const isTotalFundRow = l?.kind === 'total_fund';
                                     const isSub = l?.kind === 'sub_total' || r?.kind === 'sub_total';
+                                    const rowClass = isTotalFundRow
+                                        ? 'hover:bg-gray-50'
+                                        : isTotal
+                                          ? 'bg-gray-200 font-bold'
+                                          : isSub
+                                            ? 'bg-gray-100 font-semibold'
+                                            : 'hover:bg-gray-50';
                                     return (
-                                        <tr key={idx} className={isTotal ? 'bg-gray-200 font-bold' : isSub ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'}>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{l?.label ?? ''}</td>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
+                                        <tr
+                                            key={idx}
+                                            className={rowClass}
+                                        >
+                                            <td
+                                                className={`border border-gray-300 px-2 py-1.5 text-gray-900 ${
+                                                    isTotalFundRow ? 'bg-gray-200 font-bold' : ''
+                                                }`}
+                                            >
+                                                {l?.label ?? ''}
+                                            </td>
+                                            <td
+                                                className={`border border-gray-300 px-2 py-1.5 text-right tabular-nums ${
+                                                    isTotalFundRow ? 'bg-gray-200 font-bold' : ''
+                                                }`}
+                                            >
                                                 {l && l.kind !== 'blank' ? formatCurrency(l.previous) : ''}
                                             </td>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
+                                            <td
+                                                className={`border border-gray-300 px-2 py-1.5 text-right tabular-nums ${
+                                                    isTotalFundRow ? 'bg-gray-200 font-bold' : ''
+                                                }`}
+                                            >
                                                 {l && l.kind !== 'blank' ? formatCurrency(l.current) : ''}
                                             </td>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{r?.label ?? ''}</td>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
+                                            <td className={`border border-gray-300 px-2 py-1.5 text-gray-900 ${isTotalFundRow ? 'font-normal' : ''}`}>
+                                                {r?.label ?? ''}
+                                            </td>
+                                            <td className={`border border-gray-300 px-2 py-1.5 text-right tabular-nums ${isTotalFundRow ? 'font-normal' : ''}`}>
                                                 {r && r.kind !== 'blank' ? formatCurrency(r.previous) : ''}
                                             </td>
-                                            <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
+                                            <td className={`border border-gray-300 px-2 py-1.5 text-right tabular-nums ${isTotalFundRow ? 'font-normal' : ''}`}>
                                                 {r && r.kind !== 'blank' ? formatCurrency(r.current) : ''}
                                             </td>
                                         </tr>

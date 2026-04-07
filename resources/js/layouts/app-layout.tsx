@@ -334,14 +334,14 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
             icon: <FileBarChart size={20} />,
             submenu: [
                 {
-                    label: 'Trial Balance',
-                    href: '/report/trial-balance',
+                    label: 'Bank Statement',
+                    href: '/report/bank-statement',
                     icon: <FileText size={18} />,
                     permission: 'reports.view'
                 },
                 {
-                    label: 'Balance Sheet',
-                    href: '/report/balance-sheet',
+                    label: 'Receipt & Payment',
+                    href: '/report/receipt-payment',
                     icon: <FileText size={18} />,
                     permission: 'reports.view'
                 },
@@ -352,8 +352,23 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                     permission: 'reports.view'
                 },
                 {
-                    label: 'Receipt & Payment',
-                    href: '/report/receipt-payment',
+                    label: 'Balance Sheet',
+                    href: '/report/balance-sheet',
+                    icon: <FileText size={18} />,
+                    permission: 'reports.view'
+                },
+
+                // Keeping the below report links for later use (commented out as requested)
+                /*
+                {
+                    label: 'Bank Statement',
+                    href: '/report/bank-statement',
+                    icon: <FileText size={18} />,
+                    permission: 'reports.view'
+                },
+                {
+                    label: 'Trial Balance',
+                    href: '/report/trial-balance',
                     icon: <FileText size={18} />,
                     permission: 'reports.view'
                 },
@@ -387,6 +402,7 @@ export default function AppLayout({ title, renderHeader, children }: AppLayoutPr
                     icon: <Calendar size={18} />,
                     permission: 'reports.view'
                 },
+                */
             ],
             permission: 'reports.view'
         },

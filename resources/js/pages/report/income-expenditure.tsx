@@ -59,11 +59,17 @@ export default function IncomeExpenditure({
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(amount));
 
+    // For net surplus/deficit rows we must show the sign (deficit as negative).
+    const formatSignedCurrency = (amount: number) => {
+        const n = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(amount));
+        return amount < 0 ? `-${n}` : n;
+    };
+
     const formatDate = (dateString: string) => {
         const d = new Date(dateString);
         const day = d.getDate().toString().padStart(2, '0');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}-${month}-${d.getFullYear()}`;
     };
 
     const applyFilters = () => {
@@ -83,9 +89,11 @@ export default function IncomeExpenditure({
                 const l = r.left;
                 const rt = r.right;
                 const cls = l?.kind === 'total' || rt?.kind === 'total' ? ' class="tot"' : '';
+                const lFmt = l?.kind === 'net' ? formatSignedCurrency : formatCurrency;
+                const rFmt = rt?.kind === 'net' ? formatSignedCurrency : formatCurrency;
                 return `<tr${cls}>
-                    <td class="item">${l?.label ?? ''}</td><td class="num">${l ? formatCurrency(l.month) : ''}</td><td class="num">${l ? formatCurrency(l.ytd) : ''}</td>
-                    <td class="item">${rt?.label ?? ''}</td><td class="num">${rt ? formatCurrency(rt.month) : ''}</td><td class="num">${rt ? formatCurrency(rt.ytd) : ''}</td>
+                    <td class="item">${l?.label ?? ''}</td><td class="num">${l ? lFmt(l.month) : ''}</td><td class="num">${l ? lFmt(l.ytd) : ''}</td>
+                    <td class="item">${rt?.label ?? ''}</td><td class="num">${rt ? rFmt(rt.month) : ''}</td><td class="num">${rt ? rFmt(rt.ytd) : ''}</td>
                 </tr>`;
             })
             .join('');
@@ -93,7 +101,7 @@ export default function IncomeExpenditure({
         const fyLabel = financial_year?.label ?? '—';
 
         w.document.write(`<!DOCTYPE html><html><head><title>${report_title}</title><style>
-@page { size: A4 landscape; margin: 10mm; }
+@page { size: A4 portrait; margin: 10mm; }
 * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body { font-family: "Times New Roman", Times, serif; font-size: 9pt; line-height: 1.15; margin:0; color:#111; }
 .topbar{ display:grid; grid-template-columns: 1fr auto 1fr; align-items:start; column-gap:6mm; margin-bottom:5mm; }
@@ -105,11 +113,11 @@ h1{ font-size:14pt; margin:0; font-weight:700; }
 .addr{ font-size:9pt; color:#333; margin-top:1mm; }
 .title{ font-size:11pt; font-weight:700; margin-top:2mm; }
 .sub{ font-size:7pt; color:#333; margin-top:1mm; }
-.sub2{ font-size:6.5pt; color:#444; margin-top:0.5mm; }
+.sub2{ font-size:5.5pt; color:#444; margin-top:0.5mm; }
 table{ width:100%; border-collapse:collapse; table-layout:fixed; }
 th,td{ border:1px solid #333; padding:2mm 2.5mm; vertical-align:top; }
 thead th{ background:#d9d9d9; font-weight:700; vertical-align:middle; text-align:center; }
-th.num, td.num{ text-align:right; font-variant-numeric: tabular-nums; }
+td.num{ text-align:right; font-variant-numeric: tabular-nums; }
 td.item{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 tr.tot td{ font-weight:700; background:#e8e8e8; }
 .hdr{ font-size:9pt; line-height:1.15; }
@@ -134,12 +142,12 @@ tr.tot td{ font-weight:700; background:#e8e8e8; }
 
 <table>
   <colgroup>
-    <col style="width:31.25%;" />
-    <col style="width:9.375%;" />
-    <col style="width:9.375%;" />
-    <col style="width:31.25%;" />
-    <col style="width:9.375%;" />
-    <col style="width:9.375%;" />
+    <col style="width:28%;" />
+    <col style="width:14%;" />
+    <col style="width:16%;" />
+    <col style="width:28%;" />
+    <col style="width:14%;" />
+    <col style="width:16%;" />
   </colgroup>
   <thead>
     <tr>
@@ -148,11 +156,11 @@ tr.tot td{ font-weight:700; background:#e8e8e8; }
     </tr>
     <tr>
       <th>Expenditure items</th>
-      <th class="hdr"><span class="hdrMain">${month_column_label}</span><span class="hdrSub">${month_period_label}</span></th>
-      <th class="hdr"><span class="hdrMain">Current FY</span><span class="hdrSub">${cumulative_ytd_range_label}</span></th>
+      <th class="hdr"><span class="hdrMain">${month_column_label}</span></th>
+      <th class="hdr"><span class="hdrMain">Current FY</span></th>
       <th>Income items</th>
-      <th class="hdr"><span class="hdrMain">${month_column_label}</span><span class="hdrSub">${month_period_label}</span></th>
-      <th class="hdr"><span class="hdrMain">Current FY</span><span class="hdrSub">${cumulative_ytd_range_label}</span></th>
+      <th class="hdr"><span class="hdrMain">${month_column_label}</span></th>
+      <th class="hdr"><span class="hdrMain">Current FY</span></th>
     </tr>
   </thead>
   <tbody>${tableBody}</tbody>
@@ -265,6 +273,7 @@ tr.tot td{ font-weight:700; background:#e8e8e8; }
                             {business.address && <p className="text-xs text-gray-600">{business.address}</p>}
                             <p className="text-sm font-semibold text-gray-800 mt-1">{report_title}</p>
                             {financial_year?.label && <p className="text-xs text-gray-600">Financial year: {financial_year.label}</p>}
+                            <p className="text-[10px] text-gray-600">Report date: {formatDate(data.report_date)}</p>
                         </div>
                     </div>
 
@@ -316,6 +325,8 @@ tr.tot td{ font-weight:700; background:#e8e8e8; }
                                 {grid_rows.map((row, idx) => {
                                     const isTotal = row.left?.kind === 'total' || row.right?.kind === 'total';
                                     const isSubTotal = row.left?.kind === 'sub_total' || row.right?.kind === 'sub_total';
+                                    const leftFmt = row.left?.kind === 'net' ? formatSignedCurrency : formatCurrency;
+                                    const rightFmt = row.right?.kind === 'net' ? formatSignedCurrency : formatCurrency;
                                     return (
                                         <tr
                                             key={idx}
@@ -329,17 +340,17 @@ tr.tot td{ font-weight:700; background:#e8e8e8; }
                                         >
                                             <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{row.left?.label ?? ''}</td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {row.left && row.left.kind !== 'blank' ? formatCurrency(row.left.month) : ''}
+                                                {row.left && row.left.kind !== 'blank' ? leftFmt(row.left.month) : ''}
                                             </td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {row.left && row.left.kind !== 'blank' ? formatCurrency(row.left.ytd) : ''}
+                                                {row.left && row.left.kind !== 'blank' ? leftFmt(row.left.ytd) : ''}
                                             </td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-gray-900">{row.right?.label ?? ''}</td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {row.right && row.right.kind !== 'blank' ? formatCurrency(row.right.month) : ''}
+                                                {row.right && row.right.kind !== 'blank' ? rightFmt(row.right.month) : ''}
                                             </td>
                                             <td className="border border-gray-300 px-2 py-1.5 text-right tabular-nums">
-                                                {row.right && row.right.kind !== 'blank' ? formatCurrency(row.right.ytd) : ''}
+                                                {row.right && row.right.kind !== 'blank' ? rightFmt(row.right.ytd) : ''}
                                             </td>
                                         </tr>
                                     );

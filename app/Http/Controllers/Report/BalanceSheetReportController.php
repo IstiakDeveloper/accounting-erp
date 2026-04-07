@@ -152,12 +152,6 @@ class BalanceSheetReportController extends Controller
                 'current' => $surplusNow,
                 'kind' => 'surplus',
             ],
-            [
-                'label' => 'Total fund',
-                'previous' => $fundTotalPrev,
-                'current' => $fundTotalNow,
-                'kind' => 'total',
-            ],
         ];
 
         $assetRows = [];
@@ -184,16 +178,37 @@ class BalanceSheetReportController extends Controller
             'kind' => 'sub_total',
         ];
 
+        // Show "Total fund" one row above the final "Total" row (left side only).
+        $fundRows[] = [
+            'label' => 'Total fund',
+            'previous' => $fundTotalPrev,
+            'current' => $fundTotalNow,
+            'kind' => 'total_fund',
+        ];
         $assetRows[] = [
-            'label' => 'Total assets',
-            'previous' => $assetTotalPrev,
-            'current' => $assetTotalNow,
-            'kind' => 'total',
+            'label' => '',
+            'previous' => 0,
+            'current' => 0,
+            'kind' => 'blank',
         ];
 
-        // Ensure Total fund and Total assets appear on the same last line.
-        $fundTotalIdx = array_search('total', array_column($fundRows, 'kind'), true);
-        $assetTotalIdx = array_search('total', array_column($assetRows, 'kind'), true);
+        // Final bottom row: "Total" on both sides.
+        $fundRows[] = [
+            'label' => 'Total',
+            'previous' => $fundTotalPrev,
+            'current' => $fundTotalNow,
+            'kind' => 'grand_total',
+        ];
+        $assetRows[] = [
+            'label' => 'Total',
+            'previous' => $assetTotalPrev,
+            'current' => $assetTotalNow,
+            'kind' => 'grand_total',
+        ];
+
+        // Ensure final total appears on the same line on both sides.
+        $fundTotalIdx = array_search('grand_total', array_column($fundRows, 'kind'), true);
+        $assetTotalIdx = array_search('grand_total', array_column($assetRows, 'kind'), true);
         if ($fundTotalIdx !== false && $assetTotalIdx !== false) {
             $diff = $assetTotalIdx - $fundTotalIdx;
             if ($diff > 0) {

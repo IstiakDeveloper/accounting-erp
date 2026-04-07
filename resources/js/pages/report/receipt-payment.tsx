@@ -77,8 +77,8 @@ export default function ReceiptPayment({
     const formatDate = (dateString: string) => {
         const d = new Date(dateString);
         const day = d.getDate().toString().padStart(2, '0');
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return `${day}-${months[d.getMonth()]}-${d.getFullYear()}`;
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}-${month}-${d.getFullYear()}`;
     };
 
     const applyFilters = () => {
@@ -112,7 +112,7 @@ export default function ReceiptPayment({
         const ytdHeaderMain = year_column_label === 'Current financial year' ? 'Current FY' : year_column_label;
         const ytdHeaderSub = cumulative_ytd_range_label || '';
         w.document.write(`<!DOCTYPE html><html><head><title>${report_title}</title><style>
-@page { size: A4 landscape; margin: 10mm; }
+@page { size: A4 portrait; margin: 10mm; }
 * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 html, body { height: auto; }
 body {
@@ -136,7 +136,7 @@ body {
 .org .addr{ font-size: 9pt; color:#333; margin-top: 1mm; }
 .org .title{ font-size: 11pt; font-weight: 700; margin-top: 2mm; }
 .org .sub{ font-size: 7pt; color:#333; margin-top: 1mm; }
-.org .sub2{ font-size: 6.5pt; color:#444; margin-top: 0.5mm; }
+.org .sub2{ font-size: 5.5pt; color:#444; margin-top: 0.5mm; }
 .badge{
   border: 1px solid #333;
   padding: 2mm 3mm;
@@ -157,7 +157,7 @@ thead th{
 }
 thead th.item{ text-align: center; }
 thead th.num{ text-align: center; }
-th.num, td.num{ text-align:right; font-variant-numeric: tabular-nums; }
+td.num{ text-align:right; font-variant-numeric: tabular-nums; }
 .small{ font-weight: 400; font-size: 8pt; color:#333; margin-top: 1mm; display:block; }
 tr.tot td, tr.tot th{ font-weight:700; background:#e8e8e8; }
 th.hdr{ font-size: 9pt; line-height: 1.15; }
@@ -195,12 +195,12 @@ td.item, th.item{
 
   <table>
     <colgroup>
-      <col style="width:31.25%;" />
-      <col style="width:9.375%;" />
-      <col style="width:9.375%;" />
-      <col style="width:31.25%;" />
-      <col style="width:9.375%;" />
-      <col style="width:9.375%;" />
+      <col style="width:28%;" />
+      <col style="width:12%;" />
+      <col style="width:12%;" />
+      <col style="width:28%;" />
+      <col style="width:12%;" />
+      <col style="width:12%;" />
     </colgroup>
     <thead>
       <tr>
@@ -209,11 +209,11 @@ td.item, th.item{
       </tr>
       <tr>
         <th class="item">Receipt items</th>
-        <th class="num hdr"><span class="hdrMain">${monthHeaderMain}</span><span class="hdrSub">${monthHeaderSub}</span></th>
-        <th class="num hdr"><span class="hdrMain">${ytdHeaderMain}</span><span class="hdrSub">${ytdHeaderSub}</span></th>
+        <th class="num hdr"><span class="hdrMain">${monthHeaderMain}</span></th>
+        <th class="num hdr"><span class="hdrMain">${ytdHeaderMain}</span></th>
         <th class="item">Payment items</th>
-        <th class="num hdr"><span class="hdrMain">${monthHeaderMain}</span><span class="hdrSub">${monthHeaderSub}</span></th>
-        <th class="num hdr"><span class="hdrMain">${ytdHeaderMain}</span><span class="hdrSub">${ytdHeaderSub}</span></th>
+        <th class="num hdr"><span class="hdrMain">${monthHeaderMain}</span></th>
+        <th class="num hdr"><span class="hdrMain">${ytdHeaderMain}</span></th>
       </tr>
     </thead>
     <tbody>${tableBody}</tbody>
@@ -357,6 +357,10 @@ td.item, th.item{
                             {(financial_year?.label || financial_year_name) && (
                                 <p className="text-xs text-gray-600">Financial year: {financial_year?.label ?? financial_year_name}</p>
                             )}
+                            <p className="text-[10px] text-gray-600">
+                                Report date: {formatDate(data.report_date)}
+                                {ytd_as_of_date ? ` · YTD as-of: ${formatDate(ytd_as_of_date)}` : ''}
+                            </p>
                         </div>
                     </div>
 
@@ -377,30 +381,22 @@ td.item, th.item{
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
                                         <span className="block">{month_column_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
-                                            {month_period_label}
-                                        </span>
+
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
                                         <span className="block">{year_column_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
-                                            {cumulative_ytd_range_label}
-                                        </span>
+
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-left font-semibold text-gray-800 w-[28%]">
                                         Payment items
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
                                         <span className="block">{month_column_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
-                                            {month_period_label}
-                                        </span>
+
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
                                         <span className="block">{year_column_label}</span>
-                                        <span className="block text-[10px] font-normal text-gray-600 leading-tight mt-0.5">
-                                            {cumulative_ytd_range_label}
-                                        </span>
+
                                     </th>
                                 </tr>
                             </thead>

@@ -19,6 +19,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecurringTransactionController;
 use App\Http\Controllers\ReportConfigurationController;
 use App\Http\Controllers\Report\ReceiptPaymentReportController;
+use App\Http\Controllers\Report\BankStatementReportController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SystemSettingController;
 use App\Http\Controllers\TaxRateController;
@@ -322,6 +323,7 @@ Route::middleware(['auth', 'business'])->group(function () {
         Route::get('/profit-loss', [ReportController::class, 'profitLoss'])->name('profit_loss');
         Route::get('/income-expenditure', IncomeExpenditureReportController::class)->name('income_expenditure');
         Route::get('/receipt-payment', ReceiptPaymentReportController::class)->name('receipt_payment');
+        Route::get('/bank-statement', BankStatementReportController::class)->name('bank_statement');
         Route::get('/cash-flow', [ReportController::class, 'cashFlow'])->name('cash_flow');
         Route::get('/accounts-receivable-aging', [ReportController::class, 'accountsReceivableAging'])->name('accounts_receivable_aging');
         Route::get('/accounts-payable-aging', [ReportController::class, 'accountsPayableAging'])->name('accounts_payable_aging');
