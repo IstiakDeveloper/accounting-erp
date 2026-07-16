@@ -26,15 +26,17 @@ interface Props {
     business: Business | null;
     error: string | null;
     report_title: string;
+    start_date?: string;
+    end_date?: string;
     report_date: string;
     month_short_label: string;
     month_column_label: string;
-    /** e.g. "1 Jun – 30 Jun 2025" — MTD through report date */
+    /** e.g. "1 Jun 2025 – 30 Jun 2025" — selected period */
     month_period_label: string;
     year_column_label: string;
-    /** e.g. "1 Jul 2024 – 6 Apr 2026" — current FY cumulative through today (YTD as-of) */
+    /** e.g. "1 Jul 2024 – 6 Apr 2026" — current FY cumulative through end date */
     cumulative_ytd_range_label: string;
-    /** ISO date: YTD column is through this day (usually today, capped at FY end) */
+    /** ISO date: YTD column is through this day */
     ytd_as_of_date: string | null;
     /** Legacy: some error payloads pass a string label only */
     financial_year_name: string | null;
@@ -53,6 +55,8 @@ export default function ReceiptPayment({
     business,
     error,
     report_title,
+    start_date = '',
+    end_date = '',
     report_date,
     month_short_label,
     month_column_label,
@@ -67,18 +71,47 @@ export default function ReceiptPayment({
     grid_rows,
     is_balanced,
 }: Props) {
+    const toDateInput = (value: string | undefined | null, fallback: string) => {
+        if (!value) return fallback;
+        return typeof value === 'string' ? value.split('T')[0] : fallback;
+    };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const defaultEnd = toDateInput(end_date || report_date, today);
+    const defaultStart = toDateInput(start_date, defaultEnd.slice(0, 8) + '01');
+
     const { data, setData, get, processing } = useForm({
-        report_date: typeof report_date === 'string' ? report_date.split('T')[0] : report_date,
+        start_date: defaultStart,
+        end_date: defaultEnd,
     });
 
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(amount));
 
     const formatDate = (dateString: string) => {
-        const d = new Date(dateString);
+        const d = new Date(dateString.includes('T') ? dateString : `${dateString}T00:00:00`);
         const day = d.getDate().toString().padStart(2, '0');
         const month = (d.getMonth() + 1).toString().padStart(2, '0');
         return `${day}-${month}-${d.getFullYear()}`;
+    };
+
+    const dateLine = `Date: ${formatDate(data.start_date)} to ${formatDate(data.end_date)}`;
+    const displayMonthLabel = month_column_label?.replace('Selected period', 'Period') || 'Period';
+    const displayYearLabel = year_column_label === 'Current financial year' ? 'Current FY' : year_column_label;
+
+    const loadLogoDataUrl = async (): Promise<string> => {
+        try {
+            const res = await fetch('/logo.png');
+            const blob = await res.blob();
+            return await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(String(reader.result || ''));
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch {
+            return `${window.location.origin}/logo.png`;
+        }
     };
 
     const applyFilters = () => {
@@ -86,12 +119,17 @@ export default function ReceiptPayment({
     };
 
     const resetFilters = () => {
-        setData('report_date', new Date().toISOString().slice(0, 10));
+        const now = new Date().toISOString().slice(0, 10);
+        setData({
+            start_date: `${now.slice(0, 8)}01`,
+            end_date: now,
+        });
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const w = window.open('', '_blank');
         if (!w) return;
+        const logoUrl = await loadLogoDataUrl();
         const tableBody = grid_rows
             .map((row) => {
                 const rc = row.receipt;
@@ -105,12 +143,8 @@ export default function ReceiptPayment({
                 return `<tr${cls}><td class="item">${rc?.label ?? ''}</td><td class="num">${rcM}</td><td class="num">${rcY}</td><td class="item">${py?.label ?? ''}</td><td class="num">${pyM}</td><td class="num">${pyY}</td></tr>`;
             })
             .join('');
-        const fyLabel = financial_year?.label ?? financial_year_name ?? '';
-        const ytdAsOfLabel = ytd_as_of_date ? formatDate(ytd_as_of_date) : '';
         const monthHeaderMain = month_column_label;
-        const monthHeaderSub = month_period_label || '';
         const ytdHeaderMain = year_column_label === 'Current financial year' ? 'Current FY' : year_column_label;
-        const ytdHeaderSub = cumulative_ytd_range_label || '';
         w.document.write(`<!DOCTYPE html><html><head><title>${report_title}</title><style>
 @page { size: A4 portrait; margin: 10mm; }
 * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -126,17 +160,19 @@ body {
 .topbar{
   margin-bottom: 5mm;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 22mm 1fr 22mm;
   align-items: start;
-  column-gap: 6mm;
+  column-gap: 4mm;
 }
-.topbar .spacer{ height: 1px; }
+.topbar .logoBox{ justify-self: start; }
+.topbar .logoBox img{ height: 18mm; width: auto; display:block; }
 .topbar .center{ text-align:center; }
-.org h1{ font-size: 14pt; margin: 0; font-weight: 700; }
+.org h1{ font-size: 16pt; margin: 0; font-weight: 700; }
 .org .addr{ font-size: 9pt; color:#333; margin-top: 1mm; }
-.org .title{ font-size: 11pt; font-weight: 700; margin-top: 2mm; }
-.org .sub{ font-size: 7pt; color:#333; margin-top: 1mm; }
-.org .sub2{ font-size: 5.5pt; color:#444; margin-top: 0.5mm; }
+.org .biz{ font-size: 11pt; font-weight: 700; margin-top: 2mm; }
+.org .title{ font-size: 11pt; font-weight: 700; margin-top: 1.5mm; }
+.topbar .badgeBox{ justify-self: end; text-align: center; }
+.date{ font-size: 9pt; color:#333; text-align: right; white-space: nowrap; margin-bottom: 3mm; width: 100%; }
 .badge{
   border: 1px solid #333;
   padding: 2mm 3mm;
@@ -145,12 +181,9 @@ body {
   min-width: 22mm;
   text-align: center;
 }
-/* Month badge on the right column */
-.badgeBox{ justify-self: end; text-align: center; }
 table{ width: 100%; border-collapse: collapse; table-layout: fixed; }
 th, td{ border: 1px solid #333; padding: 2mm 2.5mm; vertical-align: top; }
 thead th{
-  background:#d9d9d9;
   font-weight:700;
   vertical-align: middle;
   text-align: center;
@@ -159,7 +192,7 @@ thead th.item{ text-align: center; }
 thead th.num{ text-align: center; }
 td.num{ text-align:right; font-variant-numeric: tabular-nums; }
 .small{ font-weight: 400; font-size: 8pt; color:#333; margin-top: 1mm; display:block; }
-tr.tot td, tr.tot th{ font-weight:700; background:#e8e8e8; }
+tr.tot td, tr.tot th{ font-weight:700; }
 th.hdr{ font-size: 9pt; line-height: 1.15; }
 .hdrMain{ display:block; white-space: nowrap; }
 .hdrSub{ display:block; font-weight: 400; font-size: 6.5pt; color:#444; margin-top: 0.5mm; white-space: nowrap; }
@@ -174,24 +207,37 @@ td.item, th.item{
   display:flex; justify-content:space-between; gap:8mm;
   font-size: 9pt;
 }
+.sign{
+  margin-top: 16mm;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12mm;
+  text-align: center;
+  font-size: 9pt;
+}
+.sign .gap{ height: 16mm; }
+.sign .label{
+  border-top: 1px solid #333;
+  padding-top: 2mm;
+  font-weight: 700;
+}
 .muted{ color:#333; }
 .warn{ color:#7c2d12; font-weight:700; }
 </style></head><body>
 <div class="sheet">
   <div class="topbar">
-    <div class="spacer"></div>
-    <div class="center org">
-      <h1>${business?.name ?? ''}</h1>
-      ${business?.address ? `<div class="addr">${business.address}</div>` : ''}
-      <div class="title">${report_title}</div>
-      <div class="sub">Financial year: ${fyLabel || '—'}</div>
-      <div class="sub2">Report date: ${formatDate(data.report_date)} · YTD as-of: ${ytdAsOfLabel || '—'}</div>
+    <div class="logoBox">
+      <img src="${logoUrl}" alt="Mousumi" />
     </div>
-    <div class="badgeBox">
-      <div class="badge">${month_short_label}</div>
-      <div class="small" style="text-align:center;">Month column</div>
+    <div class="center org">
+      <h1>Mousumi</h1>
+      ${business?.address ? `<div class="addr">${business.address}</div>` : ''}
+      <div class="biz">${business?.name ?? ''}</div>
+      <div class="title">${report_title}</div>
     </div>
   </div>
+
+  <div class="date">${dateLine}</div>
 
   <table>
     <colgroup>
@@ -223,18 +269,55 @@ td.item, th.item{
     <div class="muted">Basis: cash &amp; bank ledgers · opening + receipts = payments + closing</div>
     <div class="${is_balanced ? 'muted' : 'warn'}">${is_balanced ? 'Balanced.' : 'Totals differ — check journals / cash-bank classification.'}</div>
   </div>
+
+  <div class="sign">
+    <div><div class="gap"></div><div class="label">Prepared by</div></div>
+    <div><div class="gap"></div><div class="label">Checked by</div></div>
+    <div><div class="gap"></div><div class="label">Approved by</div></div>
+  </div>
 </div>
 </body></html>`);
         w.document.close();
-        w.print();
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
+            w.focus();
+            w.print();
+            // Close window after print dialog
+            setTimeout(() => w.close(), 500);
+        };
+        const imgs = w.document.images;
+        if (!imgs.length) {
+            doPrint();
+            return;
+        }
+        let loaded = 0;
+        const total = imgs.length;
+        Array.from(imgs).forEach((img) => {
+            if (img.complete) {
+                loaded += 1;
+                if (loaded >= total) doPrint();
+            } else {
+                img.onload = () => {
+                    loaded += 1;
+                    if (loaded >= total) doPrint();
+                };
+                img.onerror = () => {
+                    loaded += 1;
+                    if (loaded >= total) doPrint();
+                };
+            }
+        });
+        setTimeout(doPrint, 800);
     };
 
     const exportCsv = () => {
         let csv = 'data:text/csv;charset=utf-8,';
         csv += `${report_title},${business?.name ?? ''}\n`;
-        csv += `Report date (month column),${data.report_date}\n`;
-        csv += `YTD as-of (today cap),${ytd_as_of_date ?? ''}\n`;
-        csv += `Month MTD range,${month_period_label}\n`;
+        csv += `Start date,${data.start_date}\n`;
+        csv += `End date,${data.end_date}\n`;
+        csv += `Period,${month_period_label}\n`;
         csv += `FY cumulative range,${cumulative_ytd_range_label}\n\n`;
         csv += `Receipt items,${month_column_label} (${month_period_label}),${year_column_label} (${cumulative_ytd_range_label}),Payment items,${month_column_label} (${month_period_label}),${year_column_label} (${cumulative_ytd_range_label})\n`;
         grid_rows.forEach((row) => {
@@ -244,7 +327,7 @@ td.item, th.item{
         });
         const a = document.createElement('a');
         a.href = encodeURI(csv);
-        a.download = `receipts_payments_${data.report_date}.csv`;
+        a.download = `receipts_payments_${data.start_date}_${data.end_date}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -258,10 +341,8 @@ td.item, th.item{
                 <div>
                     <h1 className="text-xl font-semibold text-gray-900">{report_title}</h1>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        <strong>Month column</strong> uses the selected date (that month, 1st → date).{' '}
-                        <strong>Current financial year</strong> always uses the FY marked “current” and runs through{' '}
-                        <strong>today</strong>
-                        {ytd_as_of_date ? ` (${formatDate(ytd_as_of_date)})` : ''}, not through the old filter date.
+                        <strong>Selected period</strong> uses Start date → End date.{' '}
+                        <strong>Current financial year</strong> runs from FY start through the End date.
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -291,10 +372,7 @@ td.item, th.item{
             {financial_year && (
                 <div className="mb-3 rounded-md border border-blue-100 bg-blue-50/80 px-3 py-2 text-xs text-blue-950">
                     <p>
-                        <span className="font-semibold">Current financial year (for YTD column):</span> {financial_year.label}
-                        {ytd_as_of_date && (
-                            <span className="text-blue-900/90"> · YTD through {formatDate(ytd_as_of_date)}</span>
-                        )}
+                        <span className="font-semibold">Period:</span> {month_period_label || `${formatDate(data.start_date)} – ${formatDate(data.end_date)}`}
                     </p>
                     <p className="mt-1 text-blue-900/90">
                         <span className="font-medium">{month_column_label}:</span> {column_help.month}
@@ -309,22 +387,34 @@ td.item, th.item{
                 <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
                     <h3 className="text-sm font-medium text-gray-700 flex items-center">
                         <Filter className="h-4 w-4 mr-2 text-gray-500" />
-                        Report date
+                        Date range
                     </h3>
                     <button type="button" onClick={resetFilters} className="text-xs text-gray-600 hover:text-gray-900 flex items-center">
                         <XCircle className="h-3 w-3 mr-1" />
-                        Today
+                        This month
                     </button>
                 </div>
                 <div className="px-4 py-3 flex flex-wrap items-end gap-3">
                     <div>
-                        <label className="block text-xs font-medium text-gray-700">Date</label>
+                        <label className="block text-xs font-medium text-gray-700">Start date</label>
                         <div className="mt-1 relative">
                             <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                             <input
                                 type="date"
-                                value={data.report_date}
-                                onChange={(e) => setData('report_date', e.target.value)}
+                                value={data.start_date}
+                                onChange={(e) => setData('start_date', e.target.value)}
+                                className="block pl-8 pr-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700">End date</label>
+                        <div className="mt-1 relative">
+                            <Calendar className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                            <input
+                                type="date"
+                                value={data.end_date}
+                                onChange={(e) => setData('end_date', e.target.value)}
                                 className="block pl-8 pr-2 py-1.5 border border-gray-300 rounded-md text-sm"
                             />
                         </div>
@@ -342,25 +432,20 @@ td.item, th.item{
 
             {business && (
                 <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-400">
-                    <div className="px-3 py-3 border-b border-gray-400 bg-gray-100 relative">
+                    <div className="px-3 py-3 border-b border-gray-400 bg-gray-100 relative min-h-[5.5rem]">
+                        <img src="/logo.png" alt="Mousumi" className="absolute left-3 top-3 h-14 w-auto" />
                         <div className="absolute right-3 top-3 text-center">
                             <span className="inline-block rounded border border-gray-500 px-2 py-1 text-sm font-bold text-gray-900 bg-white">
                                 {month_short_label}
                             </span>
-                            <p className="text-[10px] text-gray-500 mt-1">Month column</p>
                         </div>
 
-                        <div className="text-center px-10">
-                            <h2 className="text-lg font-bold text-gray-900">{business.name}</h2>
-                            {business.address && <p className="text-xs text-gray-600">{business.address}</p>}
+                        <div className="text-center px-16">
+                            <h2 className="text-xl font-bold text-gray-900">Mousumi</h2>
+                            {business.address && <p className="text-xs text-gray-600 mt-1">{business.address}</p>}
+                            <p className="text-sm font-bold text-gray-900 mt-1.5">{business.name}</p>
                             <p className="text-sm font-semibold text-gray-800 mt-1">{report_title}</p>
-                            {(financial_year?.label || financial_year_name) && (
-                                <p className="text-xs text-gray-600">Financial year: {financial_year?.label ?? financial_year_name}</p>
-                            )}
-                            <p className="text-[10px] text-gray-600">
-                                Report date: {formatDate(data.report_date)}
-                                {ytd_as_of_date ? ` · YTD as-of: ${formatDate(ytd_as_of_date)}` : ''}
-                            </p>
+                            <p className="text-xs text-gray-700 mt-1 text-right">{dateLine}</p>
                         </div>
                     </div>
 
@@ -380,22 +465,22 @@ td.item, th.item{
                                         Receipt items
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{month_column_label}</span>
+                                        <span className="block">{displayMonthLabel}</span>
 
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{year_column_label}</span>
+                                        <span className="block">{displayYearLabel}</span>
 
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-left font-semibold text-gray-800 w-[28%]">
                                         Payment items
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{month_column_label}</span>
+                                        <span className="block">{displayMonthLabel}</span>
 
                                     </th>
                                     <th className="border border-gray-400 px-2 py-2 text-right font-semibold text-gray-800 w-[12%]">
-                                        <span className="block">{year_column_label}</span>
+                                        <span className="block">{displayYearLabel}</span>
 
                                     </th>
                                 </tr>
@@ -447,6 +532,20 @@ td.item, th.item{
                                     : `difference ${formatCurrency(ytd_pool_check.diff)} — check missing/wrong-dated journals or accounts not flagged as cash/bank.`}
                             </p>
                         )}
+                        <div className="grid grid-cols-3 gap-6 pt-10 pb-2 text-center text-sm text-gray-800">
+                            <div>
+                                <div className="h-12" />
+                                <div className="border-t border-gray-700 pt-1 font-semibold">Prepared by</div>
+                            </div>
+                            <div>
+                                <div className="h-12" />
+                                <div className="border-t border-gray-700 pt-1 font-semibold">Checked by</div>
+                            </div>
+                            <div>
+                                <div className="h-12" />
+                                <div className="border-t border-gray-700 pt-1 font-semibold">Approved by</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

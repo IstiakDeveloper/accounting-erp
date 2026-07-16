@@ -44,25 +44,18 @@ class BalanceSheetReportController extends Controller
             ->orderByDesc('start_date')
             ->first();
 
-        // Previous column = closing of the previous financial year (day before current FY start)
-        $prevAsOfDate = Carbon::parse($this->formatDateString($financialYear->start_date))->subDay()->format('Y-m-d');
-
-        $prevFinancialYear = FinancialYear::where('business_id', $businessId)
-            ->whereDate('start_date', '<=', $prevAsOfDate)
-            ->whereDate('end_date', '>=', $prevAsOfDate)
-            ->orderByDesc('start_date')
-            ->first();
-
         if (! $financialYear) {
+            $fallbackPrevDate = Carbon::parse($asOfDate)->subYear()->format('Y-m-d');
+
             return Inertia::render('report/balance-sheet', [
                 'business' => Business::find($businessId),
                 'error' => 'No financial year covers the selected date.',
-                'report_title' => 'Balance Sheet',
+                'report_title' => 'Statement of Balance Sheet',
                 'report_date' => $asOfDate,
                 'current_label' => Carbon::parse($asOfDate)->format("M 'y"),
-                'previous_label' => Carbon::parse($prevAsOfDate)->format("M 'y"),
+                'previous_label' => Carbon::parse($fallbackPrevDate)->format("M 'y"),
                 'current_date_label' => Carbon::parse($asOfDate)->format('j M Y'),
-                'previous_date_label' => Carbon::parse($prevAsOfDate)->format('j M Y'),
+                'previous_date_label' => Carbon::parse($fallbackPrevDate)->format('j M Y'),
                 'financial_year' => null,
                 'fund_rows' => [],
                 'asset_rows' => [],
@@ -72,6 +65,15 @@ class BalanceSheetReportController extends Controller
                 ],
             ]);
         }
+
+        // Previous column = closing of the previous financial year (day before current FY start)
+        $prevAsOfDate = Carbon::parse($this->formatDateString($financialYear->start_date))->subDay()->format('Y-m-d');
+
+        $prevFinancialYear = FinancialYear::where('business_id', $businessId)
+            ->whereDate('start_date', '<=', $prevAsOfDate)
+            ->whereDate('end_date', '>=', $prevAsOfDate)
+            ->orderByDesc('start_date')
+            ->first();
 
         $fyStart = $this->formatDateString($financialYear->start_date);
         $fyEnd = $this->formatDateString($financialYear->end_date);
@@ -96,7 +98,7 @@ class BalanceSheetReportController extends Controller
             return Inertia::render('report/balance-sheet', [
                 'business' => Business::find($businessId),
                 'error' => 'Mark at least one ledger as cash or bank to run this report.',
-                'report_title' => 'Balance Sheet',
+                'report_title' => 'Statement of Balance Sheet',
                 'report_date' => $asOfDate,
                 'current_label' => Carbon::parse($asOfDate)->format("M 'y"),
                 'previous_label' => Carbon::parse($prevAsOfDate)->format("M 'y"),
@@ -235,7 +237,7 @@ class BalanceSheetReportController extends Controller
         return Inertia::render('report/balance-sheet', [
             'business' => Business::find($businessId),
             'error' => null,
-            'report_title' => 'Balance Sheet',
+            'report_title' => 'Statement of Balance Sheet',
             'report_date' => $asOfDate,
             'current_label' => Carbon::parse($asOfDate)->format("M 'y"),
             'previous_label' => Carbon::parse($prevAsOfDate)->format("M 'y"),

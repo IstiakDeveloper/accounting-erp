@@ -14,9 +14,8 @@ use Inertia\Inertia;
 
 /**
  * NGO-style Receipts & Payments:
- * - Month column: cumulative from the 1st of the selected month through the selected report date.
- * - "Current financial year" column: cumulative from the start of the financial year that contains the selected report date,
- *   through the selected report date (date-driven, no FY dropdown).
+ * - Period column: cumulative from selected start_date through end_date.
+ * - "Current financial year" column: cumulative from the FY that contains end_date, through end_date.
  */
 class ReceiptPaymentReportController extends Controller
 {
@@ -28,36 +27,48 @@ class ReceiptPaymentReportController extends Controller
             return redirect()->route('business.select');
         }
 
-        $reportDate = $request->input('report_date', Carbon::now()->format('Y-m-d'));
+        $endDate = $request->input('end_date', $request->input('report_date', Carbon::now()->format('Y-m-d')));
+        $startDate = $request->input('start_date', Carbon::parse($endDate)->startOfMonth()->format('Y-m-d'));
 
         try {
-            Carbon::parse($reportDate);
+            Carbon::parse($endDate);
         } catch (\Throwable $e) {
-            $reportDate = Carbon::now()->format('Y-m-d');
+            $endDate = Carbon::now()->format('Y-m-d');
         }
 
-        // Date-driven FY: pick the FY that contains report_date.
+        try {
+            Carbon::parse($startDate);
+        } catch (\Throwable $e) {
+            $startDate = Carbon::parse($endDate)->startOfMonth()->format('Y-m-d');
+        }
+
+        $startDate = Carbon::parse($startDate)->format('Y-m-d');
+        $endDate = Carbon::parse($endDate)->format('Y-m-d');
+
+        if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
+            $startDate = $endDate;
+        }
+
+        // Date-driven FY: pick the FY that contains end_date.
         $financialYear = FinancialYear::where('business_id', $businessId)
-            ->whereDate('start_date', '<=', $reportDate)
-            ->whereDate('end_date', '>=', $reportDate)
+            ->whereDate('start_date', '<=', $endDate)
+            ->whereDate('end_date', '>=', $endDate)
             ->orderByDesc('start_date')
             ->first();
 
         if (! $financialYear) {
-            return Inertia::render('report/receipt-payment', $this->emptyPayload($businessId, $reportDate,
-                'No financial year covers the selected date. Create or adjust a financial year that includes this date.'));
+            return Inertia::render('report/receipt-payment', $this->emptyPayload($businessId, $startDate, $endDate,
+                'No financial year covers the selected end date. Create or adjust a financial year that includes this date.'));
         }
 
-        $monthStart = Carbon::parse($reportDate)->startOfMonth()->format('Y-m-d');
-        /** Month column: cumulative 1st → selected report date. */
-        $monthAsOfDate = $reportDate;
-        $dayBeforeMonth = Carbon::parse($monthStart)->subDay()->format('Y-m-d');
+        $periodStart = $startDate;
+        $periodEnd = $endDate;
+        $dayBeforePeriod = Carbon::parse($periodStart)->subDay()->format('Y-m-d');
 
         $fyStart = $this->formatDateString($financialYear->start_date);
         $fyEnd = $this->formatDateString($financialYear->end_date);
         $dayBeforeFy = Carbon::parse($fyStart)->subDay()->format('Y-m-d');
-        // FY-to-date is also "as-of" the selected report date.
-        $ytdAsOfDate = $reportDate;
+        $ytdAsOfDate = $endDate;
 
         $cashIds = LedgerAccount::where('business_id', $businessId)
             ->where('is_cash_account', true)
@@ -78,13 +89,13 @@ class ReceiptPaymentReportController extends Controller
         if (empty($cashBankIds)) {
             $fyLabel = Carbon::parse($financialYear->start_date)->format('j M Y').' – '.Carbon::parse($financialYear->end_date)->format('j M Y');
 
-            return Inertia::render('report/receipt-payment', $this->emptyPayload($businessId, $reportDate,
+            return Inertia::render('report/receipt-payment', $this->emptyPayload($businessId, $startDate, $endDate,
                 'Mark at least one ledger as cash or bank to run this report.', $fyLabel));
         }
 
-        // Opening (month) = balance as of day before the month starts.
-        $openingCashMonth = $this->sumCashBankBalance($businessId, $cashIds, $dayBeforeMonth);
-        $openingBankMonth = $this->sumCashBankBalance($businessId, $bankIds, $dayBeforeMonth);
+        // Opening (period) = balance as of day before the selected start date.
+        $openingCashMonth = $this->sumCashBankBalance($businessId, $cashIds, $dayBeforePeriod);
+        $openingBankMonth = $this->sumCashBankBalance($businessId, $bankIds, $dayBeforePeriod);
 
         // Opening (YTD) must represent opening at the start of the financial year.
         // If opening balances are stored as a dated "Opening Balance" voucher on FY start,
@@ -92,10 +103,10 @@ class ReceiptPaymentReportController extends Controller
         $openingCashYtd = $this->sumOpeningAtFinancialYearStart($businessId, $cashIds, $fyStart, $dayBeforeFy);
         $openingBankYtd = $this->sumOpeningAtFinancialYearStart($businessId, $bankIds, $fyStart, $dayBeforeFy);
 
-        // Month column: 1st → report date. FY-to-date column: FY start → report date.
-        $receiptsMonth = $this->getReceiptsOrPayments($businessId, $cashBankIds, $monthStart, $monthAsOfDate, 'receipt');
+        // Period column: start → end. FY-to-date column: FY start → end.
+        $receiptsMonth = $this->getReceiptsOrPayments($businessId, $cashBankIds, $periodStart, $periodEnd, 'receipt');
         $receiptsYtd = $this->getReceiptsOrPayments($businessId, $cashBankIds, $fyStart, $ytdAsOfDate, 'receipt');
-        $paymentsMonth = $this->getReceiptsOrPayments($businessId, $cashBankIds, $monthStart, $monthAsOfDate, 'payment');
+        $paymentsMonth = $this->getReceiptsOrPayments($businessId, $cashBankIds, $periodStart, $periodEnd, 'payment');
         $paymentsYtd = $this->getReceiptsOrPayments($businessId, $cashBankIds, $fyStart, $ytdAsOfDate, 'payment');
 
         $receiptHeadIds = array_unique(array_merge(array_keys($receiptsMonth), array_keys($receiptsYtd)));
@@ -154,8 +165,8 @@ class ReceiptPaymentReportController extends Controller
         }
         usort($paymentRows, fn ($a, $b) => strcasecmp($a['label'], $b['label']));
 
-        $closingCashMonth = $this->sumCashBankBalance($businessId, $cashIds, $monthAsOfDate);
-        $closingBankMonth = $this->sumCashBankBalance($businessId, $bankIds, $monthAsOfDate);
+        $closingCashMonth = $this->sumCashBankBalance($businessId, $cashIds, $periodEnd);
+        $closingBankMonth = $this->sumCashBankBalance($businessId, $bankIds, $periodEnd);
         $closingCashYtd = $this->sumCashBankBalance($businessId, $cashIds, $ytdAsOfDate);
         $closingBankYtd = $this->sumCashBankBalance($businessId, $bankIds, $ytdAsOfDate);
 
@@ -167,7 +178,7 @@ class ReceiptPaymentReportController extends Controller
         ];
 
         foreach ($bankAccounts as $bank) {
-            $balMonth = $this->getLedgerBalanceAt($businessId, $bank->id, $monthAsOfDate);
+            $balMonth = $this->getLedgerBalanceAt($businessId, $bank->id, $periodEnd);
             $balYtd = $this->getLedgerBalanceAt($businessId, $bank->id, $ytdAsOfDate);
             $paymentRows[] = [
                 'kind' => 'closing_bank',
@@ -208,16 +219,18 @@ class ReceiptPaymentReportController extends Controller
             $ytdAsOfDate
         );
 
-        $monthPeriodLabel = Carbon::parse($monthStart)->format('j M').' – '.Carbon::parse($monthAsOfDate)->format('j M Y');
+        $monthPeriodLabel = Carbon::parse($periodStart)->format('j M Y').' – '.Carbon::parse($periodEnd)->format('j M Y');
         $ytdRangeLabel = Carbon::parse($fyStart)->format('j M Y').' – '.Carbon::parse($ytdAsOfDate)->format('j M Y');
 
         return Inertia::render('report/receipt-payment', [
             'business' => Business::find($businessId),
             'error' => null,
-            'report_title' => 'Receipts and Payments Account',
-            'report_date' => $reportDate,
-            'month_short_label' => Carbon::parse($reportDate)->format("M 'y"),
-            'month_column_label' => Carbon::parse($reportDate)->format('F Y'),
+            'report_title' => 'Statement of Receipt and Payment',
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'report_date' => $endDate,
+            'month_short_label' => Carbon::parse($endDate)->format("M 'y"),
+            'month_column_label' => 'Selected period',
             'month_period_label' => $monthPeriodLabel,
             'year_column_label' => 'Current financial year',
             'cumulative_ytd_range_label' => $ytdRangeLabel,
@@ -228,8 +241,8 @@ class ReceiptPaymentReportController extends Controller
                 'label' => Carbon::parse($fyStart)->format('j M Y').' – '.Carbon::parse($fyEnd)->format('j M Y'),
             ],
             'column_help' => [
-                'month' => 'Cumulative within the selected calendar month: 1st through the report date. Opening = balance just before the 1st.',
-                'ytd' => 'Cumulative from the financial year start through the selected report date. Opening = cash & bank just before the FY began.',
+                'month' => 'Cumulative for the selected date range: start date through end date. Opening = balance just before the start date.',
+                'ytd' => 'Cumulative from the financial year start through the selected end date. Opening = cash & bank just before the FY began.',
             ],
             'ytd_pool_check' => $ytdPoolCheck,
             'financial_year_name' => null,
@@ -242,15 +255,17 @@ class ReceiptPaymentReportController extends Controller
         ]);
     }
 
-    private function emptyPayload(int $businessId, string $reportDate, string $error, ?string $financialYearName = null): array
+    private function emptyPayload(int $businessId, string $startDate, string $endDate, string $error, ?string $financialYearName = null): array
     {
         return [
             'business' => Business::find($businessId),
             'error' => $error,
-            'report_title' => 'Receipts and Payments Account',
-            'report_date' => $reportDate,
-            'month_short_label' => Carbon::parse($reportDate)->format("M 'y"),
-            'month_column_label' => Carbon::parse($reportDate)->format('F Y'),
+            'report_title' => 'Statement of Receipt and Payment',
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'report_date' => $endDate,
+            'month_short_label' => Carbon::parse($endDate)->format("M 'y"),
+            'month_column_label' => 'Selected period',
             'month_period_label' => '',
             'year_column_label' => 'Current financial year',
             'cumulative_ytd_range_label' => '',

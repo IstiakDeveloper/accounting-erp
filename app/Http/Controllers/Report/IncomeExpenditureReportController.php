@@ -20,27 +20,44 @@ class IncomeExpenditureReportController extends Controller
             return redirect()->route('business.select');
         }
 
-        $reportDate = $request->input('report_date', Carbon::now()->format('Y-m-d'));
+        $endDate = $request->input('end_date', $request->input('report_date', Carbon::now()->format('Y-m-d')));
+        $startDate = $request->input('start_date', Carbon::parse($endDate)->startOfMonth()->format('Y-m-d'));
 
         try {
-            Carbon::parse($reportDate);
+            Carbon::parse($endDate);
         } catch (\Throwable $e) {
-            $reportDate = Carbon::now()->format('Y-m-d');
+            $endDate = Carbon::now()->format('Y-m-d');
+        }
+
+        try {
+            Carbon::parse($startDate);
+        } catch (\Throwable $e) {
+            $startDate = Carbon::parse($endDate)->startOfMonth()->format('Y-m-d');
+        }
+
+        $startDate = Carbon::parse($startDate)->format('Y-m-d');
+        $endDate = Carbon::parse($endDate)->format('Y-m-d');
+
+        if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
+            $startDate = $endDate;
         }
 
         $financialYear = FinancialYear::where('business_id', $businessId)
-            ->whereDate('start_date', '<=', $reportDate)
-            ->whereDate('end_date', '>=', $reportDate)
+            ->whereDate('start_date', '<=', $endDate)
+            ->whereDate('end_date', '>=', $endDate)
             ->orderByDesc('start_date')
             ->first();
 
         if (! $financialYear) {
             return Inertia::render('report/income-expenditure', [
                 'business' => Business::find($businessId),
-                'error' => 'No financial year covers the selected date.',
-                'report_date' => $reportDate,
-                'month_short_label' => Carbon::parse($reportDate)->format("M 'y"),
-                'month_column_label' => Carbon::parse($reportDate)->format('F Y'),
+                'error' => 'No financial year covers the selected end date.',
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'report_date' => $endDate,
+                'report_title' => 'Statement of Income and Expenditure',
+                'month_short_label' => Carbon::parse($endDate)->format("M 'y"),
+                'month_column_label' => 'Selected period',
                 'month_period_label' => '',
                 'year_column_label' => 'Current financial year',
                 'cumulative_ytd_range_label' => '',
@@ -53,14 +70,14 @@ class IncomeExpenditureReportController extends Controller
             ]);
         }
 
-        $monthStart = Carbon::parse($reportDate)->startOfMonth()->format('Y-m-d');
-        $monthAsOfDate = $reportDate;
+        $periodStart = $startDate;
+        $periodEnd = $endDate;
         $fyStart = $this->formatDateString($financialYear->start_date);
         $fyEnd = $this->formatDateString($financialYear->end_date);
-        $ytdAsOfDate = $reportDate;
+        $ytdAsOfDate = $endDate;
 
-        $expenditureMonth = $this->getNatureLedgerSums($businessId, 'expense', $monthStart, $monthAsOfDate);
-        $incomeMonth = $this->getNatureLedgerSums($businessId, 'income', $monthStart, $monthAsOfDate);
+        $expenditureMonth = $this->getNatureLedgerSums($businessId, 'expense', $periodStart, $periodEnd);
+        $incomeMonth = $this->getNatureLedgerSums($businessId, 'income', $periodStart, $periodEnd);
         $expenditureYtd = $this->getNatureLedgerSums($businessId, 'expense', $fyStart, $ytdAsOfDate);
         $incomeYtd = $this->getNatureLedgerSums($businessId, 'income', $fyStart, $ytdAsOfDate);
 
@@ -134,11 +151,13 @@ class IncomeExpenditureReportController extends Controller
         return Inertia::render('report/income-expenditure', [
             'business' => Business::find($businessId),
             'error' => null,
-            'report_title' => 'Income and Expenditure Account',
-            'report_date' => $reportDate,
-            'month_short_label' => Carbon::parse($reportDate)->format("M 'y"),
-            'month_column_label' => Carbon::parse($reportDate)->format('F Y'),
-            'month_period_label' => Carbon::parse($monthStart)->format('j M').' – '.Carbon::parse($monthAsOfDate)->format('j M Y'),
+            'report_title' => 'Statement of Income and Expenditure',
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'report_date' => $endDate,
+            'month_short_label' => Carbon::parse($endDate)->format("M 'y"),
+            'month_column_label' => 'Selected period',
+            'month_period_label' => Carbon::parse($periodStart)->format('j M Y').' – '.Carbon::parse($periodEnd)->format('j M Y'),
             'year_column_label' => 'Current financial year',
             'cumulative_ytd_range_label' => Carbon::parse($fyStart)->format('j M Y').' – '.Carbon::parse($ytdAsOfDate)->format('j M Y'),
             'ytd_as_of_date' => $ytdAsOfDate,

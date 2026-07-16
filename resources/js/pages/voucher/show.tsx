@@ -55,6 +55,12 @@ interface FinancialYear {
     is_locked: boolean;
 }
 
+interface Business {
+    id: number;
+    name: string;
+    address: string | null;
+}
+
 interface VoucherItem {
     id: number;
     ledger_account_id: number;
@@ -70,6 +76,7 @@ interface Voucher {
     id: number;
     voucher_type_id: number;
     financial_year_id: number;
+    business_id: number;
     voucher_number: string;
     date: string;
     party_id: number | null;
@@ -82,7 +89,8 @@ interface Voucher {
     voucher_type: VoucherType;
     financial_year: FinancialYear;
     party: Party | null;
-    voucher_items: VoucherItem[]; // This is important - using voucher_items instead of voucherItems
+    voucher_items: VoucherItem[];
+    business: Business;
     created_by: User;
 }
 
@@ -138,6 +146,193 @@ export default function VoucherShow({ voucher }: Props) {
 
     const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
 
+    const formatDateDDMMYYYY = (dateString: string): string => {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    };
+
+    const loadLogoDataUrl = async (): Promise<string> => {
+        try {
+            const res = await fetch('/logo.png');
+            const blob = await res.blob();
+            return await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(String(reader.result || ''));
+                reader.readAsDataURL(blob);
+            });
+        } catch {
+            return `${window.location.origin}/logo.png`;
+        }
+    };
+
+    const handlePrint = async () => {
+        const w = window.open('', '_blank');
+        if (!w) {
+            alert('Could not open print window. Please check your popup blocker.');
+            return;
+        }
+
+        const logoUrl = await loadLogoDataUrl();
+        writePrintDocument(w, logoUrl);
+    };
+
+    const writePrintDocument = (w: Window, logoUrl: string) => {
+        const tableBody = voucher.voucher_items
+            .map((item) => {
+                const db = formatCurrency(item.debit_amount || 0);
+                const cr = formatCurrency(item.credit_amount || 0);
+                const ccName = item.costCenter?.name || '-';
+                return `<tr><td class="item">${item.ledger_account.name}</td><td class="code">${item.ledger_account.code}</td><td class="num">${ccName}</td><td class="num">${db}</td><td class="num">${cr}</td></tr>`;
+            })
+            .join('');
+
+        const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01;
+        const balanceStatus = isBalanced
+            ? '<span class="muted">Balanced · Debit = Credit</span>'
+            : '<span class="warn">⚠ Totals differ — Debit ≠ Credit</span>';
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${voucher.voucher_type.name} #${voucher.voucher_number}</title>
+<style>
+@page { size: A4 portrait; margin: 8mm; }
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { height: auto; }
+body { font-family: "Times New Roman", Times, serif; font-size: 9pt; line-height: 1.2; color: #111; margin: 0; padding: 0; }
+.sheet { width: 100%; max-width: 210mm; margin: 0 auto; }
+.topbar { margin-bottom: 6mm; display: grid; grid-template-columns: 20mm 1fr; align-items: start; column-gap: 6mm; }
+.logoBox { justify-self: start; text-align: center; }
+.logoBox img { height: 16mm; width: auto; display: block; }
+.header { text-align: center; }
+.header h1 { font-size: 16pt; margin: 0; font-weight: 700; color: #000; }
+.header .subtitle { font-size: 9pt; color: #333; margin-top: 1mm; }
+.header .biz { font-size: 10pt; font-weight: 600; margin-top: 2mm; color: #000; }
+.header .addr { font-size: 8pt; color: #444; margin-top: 0.5mm; }
+.header .vtype { font-size: 10pt; font-weight: 700; margin-top: 2mm; color: #000; }
+.meta { margin: 5mm 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; font-size: 9pt; }
+.meta-item { }
+.meta-label { font-weight: 600; color: #000; }
+.meta-value { color: #333; margin-top: 0.5mm; }
+.date-section { text-align: right; font-size: 9pt; margin-bottom: 3mm; font-weight: 600; }
+table { width: 100%; border-collapse: collapse; margin-top: 3mm; }
+colgroup col { }
+thead { }
+th { border-top: 1px solid #000; border-bottom: 2px solid #000; padding: 2mm 1.5mm; font-weight: 700; vertical-align: middle; text-align: center; font-size: 8.5pt; }
+th.item { text-align: left; }
+th.code { text-align: center; }
+th.num { text-align: right; }
+td { border: 1px solid #ccc; padding: 2mm 1.5mm; vertical-align: top; font-size: 9pt; }
+td.item { text-align: left; }
+td.code { text-align: center; color: #666; font-size: 8.5pt; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.tot td { border-top: 2px solid #000; border-bottom: 2px solid #000; font-weight: 700; padding: 2.5mm 1.5mm; }
+tr.tot td.num { background-color: #f9f9f9; }
+.footer { margin-top: 5mm; display: flex; justify-content: space-between; align-items: center; font-size: 9pt; padding: 2mm 0; border-top: 1px solid #ddd; }
+.footer-left { font-size: 8pt; color: #666; }
+.footer-right { font-weight: 600; }
+.muted { color: #333; }
+.warn { color: #b91c1c; font-weight: 700; }
+.sign { margin-top: 18mm; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15mm; text-align: center; font-size: 9pt; }
+.sign-box { }
+.sign-gap { height: 16mm; border-bottom: 1px solid #000; }
+.sign-label { font-weight: 700; margin-top: 2mm; }
+.narration-box { margin-top: 4mm; padding: 2mm; border: 1px solid #ccc; font-size: 8pt; min-height: 8mm; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="topbar">
+    <div class="logoBox">
+      ${logoUrl ? `<img src="${logoUrl}" alt="Logo" />` : '<div style="height:16mm;"></div>'}
+    </div>
+    <div class="header">
+      <h1>Mousumi</h1>
+      ${voucher.business?.address ? `<div class="addr">${voucher.business.address}</div>` : ''}
+      <div class="biz">${voucher.business?.name || ''}</div>
+      <div class="vtype">${voucher.voucher_type.name}</div>
+    </div>
+  </div>
+
+  <div class="date-section">Voucher #${voucher.voucher_number} · Date: ${formatDateDDMMYYYY(voucher.date)}</div>
+
+  <div class="meta">
+    <div class="meta-item">
+      <div class="meta-label">Reference</div>
+      <div class="meta-value">${voucher.reference || '—'}</div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-label">Party</div>
+      <div class="meta-value">${voucher.party?.name || '—'}</div>
+    </div>
+  </div>
+
+  ${voucher.narration ? `<div class="narration-box"><strong>Narration:</strong> ${voucher.narration}</div>` : ''}
+
+  <table>
+    <colgroup>
+      <col style="width: 35%;" />
+      <col style="width: 10%;" />
+      <col style="width: 20%;" />
+      <col style="width: 17.5%;" />
+      <col style="width: 17.5%;" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th class="item">Account Name</th>
+        <th class="code">Code</th>
+        <th>Cost Center</th>
+        <th class="num">Debit</th>
+        <th class="num">Credit</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableBody}
+      <tr class="tot">
+        <td colspan="3" style="text-align: right; font-weight: 700;">TOTAL</td>
+        <td class="num">${formatCurrency(totalDebit)}</td>
+        <td class="num">${formatCurrency(totalCredit)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div class="footer-left">Reference: ${voucher.reference || 'N/A'} · Posted: ${voucher.is_posted ? 'Yes' : 'No'}</div>
+    <div class="footer-right">${balanceStatus}</div>
+  </div>
+
+  <div class="sign">
+    <div class="sign-box">
+      <div class="sign-gap"></div>
+      <div class="sign-label">Prepared by</div>
+    </div>
+    <div class="sign-box">
+      <div class="sign-gap"></div>
+      <div class="sign-label">Checked by</div>
+    </div>
+    <div class="sign-box">
+      <div class="sign-gap"></div>
+      <div class="sign-label">Approved by</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>`;
+
+        w.document.write(html);
+        w.document.close();
+
+        setTimeout(() => {
+            w.focus();
+            w.print();
+            setTimeout(() => w.close(), 500);
+        }, 500);
+    };
+
     return (
         <AppLayout title={`${voucher.voucher_type.name} #${voucher.voucher_number}`}>
             <Head title={`${voucher.voucher_type.name} #${voucher.voucher_number}`} />
@@ -153,13 +348,13 @@ export default function VoucherShow({ voucher }: Props) {
                     </Link>
                 </div>
                 <div className="flex space-x-2">
-                    <Link
-                        href={route('voucher.print', voucher.id)}
+                    <button
+                        onClick={handlePrint}
                         className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                         <Printer className="h-4 w-4 mr-1" />
                         Print
-                    </Link>
+                    </button>
                     <Link
                         href={route('voucher.edit', voucher.id)}
                         className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm leading-4 font-medium rounded-md text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

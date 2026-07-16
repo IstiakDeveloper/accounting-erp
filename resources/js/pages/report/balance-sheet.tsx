@@ -57,6 +57,30 @@ export default function BalanceSheet({
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(amount));
 
+    const formatDate = (dateString: string) => {
+        const d = new Date(dateString);
+        const day = d.getDate().toString().padStart(2, '0');
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        return `${day}-${month}-${d.getFullYear()}`;
+    };
+
+    const dateLine = `As on ${formatDate(data.report_date)}`;
+
+    const loadLogoDataUrl = async (): Promise<string> => {
+        try {
+            const res = await fetch('/logo.png');
+            const blob = await res.blob();
+            return await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(String(reader.result || ''));
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch {
+            return `${window.location.origin}/logo.png`;
+        }
+    };
+
     const applyFilters = () => {
         get(route('report.balance_sheet'), { preserveState: true, preserveScroll: true });
     };
@@ -65,9 +89,10 @@ export default function BalanceSheet({
         setData('report_date', new Date().toISOString().slice(0, 10));
     };
 
-    const handlePrint = () => {
+    const handlePrint = async () => {
         const w = window.open('', '_blank');
         if (!w) return;
+        const logoUrl = await loadLogoDataUrl();
 
         const max = Math.max(fund_rows.length, asset_rows.length);
         const body = Array.from({ length: max })
@@ -99,48 +124,53 @@ export default function BalanceSheet({
             })
             .join('');
 
-        const fyLabel = financial_year?.label ?? '—';
-
         w.document.write(`<!DOCTYPE html><html><head><title>${report_title}</title><style>
 @page { size: A4 portrait; margin: 10mm; }
 * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body { font-family: "Times New Roman", Times, serif; font-size: 9pt; line-height: 1.15; margin:0; color:#111; }
-.topbar{ display:grid; grid-template-columns: 1fr auto 1fr; align-items:start; column-gap:6mm; margin-bottom:5mm; }
+.topbar{ display:grid; grid-template-columns: 22mm 1fr 22mm; align-items:start; column-gap:4mm; margin-bottom:5mm; }
+.topbar .logoBox{ justify-self:start; }
+.topbar .logoBox img{ height:18mm; width:auto; display:block; }
 .topbar .center{ text-align:center; }
 .topbar .badgeBox{ justify-self:end; text-align:center; }
 .badge{ border:1px solid #333; padding:2mm 3mm; font-size:10pt; font-weight:700; min-width:22mm; text-align:center; }
 .small{ font-weight:400; font-size:7pt; color:#444; margin-top:0.5mm; display:block; }
-h1{ font-size:14pt; margin:0; font-weight:700; }
+h1{ font-size:16pt; margin:0; font-weight:700; }
 .addr{ font-size:9pt; color:#333; margin-top:1mm; }
-.title{ font-size:11pt; font-weight:700; margin-top:2mm; }
-.sub{ font-size:7pt; color:#333; margin-top:1mm; }
+.biz{ font-size:11pt; font-weight:700; margin-top:2mm; }
+.title{ font-size:11pt; font-weight:700; margin-top:1.5mm; }
+.date{ font-size:9pt; color:#333; text-align:right; white-space:nowrap; margin-bottom:3mm; width:100%; }
 table{ width:100%; border-collapse:collapse; table-layout:fixed; }
 th,td{ border:1px solid #333; padding:2mm 2.5mm; vertical-align:top; }
-thead th{ background:#d9d9d9; font-weight:700; vertical-align:middle; text-align:center; }
+thead th{ font-weight:700; vertical-align:middle; text-align:center; }
 td.num{ text-align:right; font-variant-numeric: tabular-nums; }
 td.item{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-tr.sub td{ background:#f2f2f2; font-weight:700; }
-tr.tot td{ background:#e8e8e8; font-weight:700; }
+tr.sub td{ font-weight:700; }
+tr.tot td{ font-weight:700; }
 /* Total fund row: bold only on left side */
-tr.totFund td{ background:#e8e8e8; font-weight:700; }
-tr.totFund td:nth-child(4),
-tr.totFund td:nth-child(5),
-tr.totFund td:nth-child(6){ font-weight:400; background:#fff; }
+tr.totFund td{ font-weight:700; }
 .hdrSub{ display:block; font-weight:400; font-size:6.5pt; color:#444; margin-top:0.5mm; white-space:nowrap; }
+.sign{ margin-top:16mm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:12mm; text-align:center; font-size:9pt; }
+.sign .gap{ height:16mm; }
+.sign .label{ border-top:1px solid #333; padding-top:2mm; font-weight:700; }
 </style></head><body>
 <div class="topbar">
-  <div></div>
+  <div class="logoBox">
+    <img src="${logoUrl}" alt="Mousumi" />
+  </div>
   <div class="center">
-    <h1>${business?.name ?? ''}</h1>
+    <h1>Mousumi</h1>
     ${business?.address ? `<div class="addr">${business.address}</div>` : ''}
+    <div class="biz">${business?.name ?? ''}</div>
     <div class="title">${report_title}</div>
-    <div class="sub">Financial year: ${fyLabel} · As of: ${current_date_label}</div>
   </div>
   <div class="badgeBox">
     <div class="badge">${current_label}</div>
     <span class="small">Current column</span>
   </div>
 </div>
+
+<div class="date">${dateLine}</div>
 
 <table>
   <colgroup>
@@ -167,9 +197,46 @@ tr.totFund td:nth-child(6){ font-weight:400; background:#fff; }
   </thead>
   <tbody>${body}</tbody>
 </table>
+
+<div class="sign">
+  <div><div class="gap"></div><div class="label">Prepared by</div></div>
+  <div><div class="gap"></div><div class="label">Checked by</div></div>
+  <div><div class="gap"></div><div class="label">Approved by</div></div>
+</div>
 </body></html>`);
         w.document.close();
-        w.print();
+        let printed = false;
+        const doPrint = () => {
+            if (printed) return;
+            printed = true;
+            w.focus();
+            w.print();
+            // Close window after print dialog
+            setTimeout(() => w.close(), 500);
+        };
+        const imgs = w.document.images;
+        if (!imgs.length) {
+            doPrint();
+            return;
+        }
+        let loaded = 0;
+        const total = imgs.length;
+        Array.from(imgs).forEach((img) => {
+            if (img.complete) {
+                loaded += 1;
+                if (loaded >= total) doPrint();
+            } else {
+                img.onload = () => {
+                    loaded += 1;
+                    if (loaded >= total) doPrint();
+                };
+                img.onerror = () => {
+                    loaded += 1;
+                    if (loaded >= total) doPrint();
+                };
+            }
+        });
+        setTimeout(doPrint, 800);
     };
 
     const exportCsv = () => {
@@ -261,7 +328,8 @@ tr.totFund td:nth-child(6){ font-weight:400; background:#fff; }
 
             {business && (
                 <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-400">
-                    <div className="px-3 py-3 border-b border-gray-400 bg-gray-100 relative">
+                    <div className="px-3 py-3 border-b border-gray-400 bg-gray-100 relative min-h-[5.5rem]">
+                        <img src="/logo.png" alt="Mousumi" className="absolute left-3 top-3 h-14 w-auto" />
                         <div className="absolute right-3 top-3 text-center">
                             <span className="inline-block rounded border border-gray-500 px-2 py-1 text-sm font-bold text-gray-900 bg-white">
                                 {current_label}
@@ -269,11 +337,12 @@ tr.totFund td:nth-child(6){ font-weight:400; background:#fff; }
                             <p className="text-[10px] text-gray-500 mt-1">Current column</p>
                         </div>
 
-                        <div className="text-center px-10">
-                            <h2 className="text-lg font-bold text-gray-900">{business.name}</h2>
-                            {business.address && <p className="text-xs text-gray-600">{business.address}</p>}
+                        <div className="text-center px-16">
+                            <h2 className="text-xl font-bold text-gray-900">Mousumi</h2>
+                            {business.address && <p className="text-xs text-gray-600 mt-1">{business.address}</p>}
+                            <p className="text-sm font-bold text-gray-900 mt-1.5">{business.name}</p>
                             <p className="text-sm font-semibold text-gray-800 mt-1">{report_title}</p>
-                            {financial_year?.label && <p className="text-xs text-gray-600">Financial year: {financial_year.label}</p>}
+                            <p className="text-xs text-gray-700 mt-1 text-right">{dateLine}</p>
                         </div>
                     </div>
 
@@ -371,6 +440,23 @@ tr.totFund td:nth-child(6){ font-weight:400; background:#fff; }
                                 })}
                             </tbody>
                         </table>
+                    </div>
+
+                    <div className="px-3 py-4 bg-gray-50 border-t border-gray-400">
+                        <div className="grid grid-cols-3 gap-6 text-center text-sm text-gray-800">
+                            <div>
+                                <div className="h-12" />
+                                <div className="border-t border-gray-700 pt-1 font-semibold">Prepared by</div>
+                            </div>
+                            <div>
+                                <div className="h-12" />
+                                <div className="border-t border-gray-700 pt-1 font-semibold">Checked by</div>
+                            </div>
+                            <div>
+                                <div className="h-12" />
+                                <div className="border-t border-gray-700 pt-1 font-semibold">Approved by</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
